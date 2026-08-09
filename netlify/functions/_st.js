@@ -65,9 +65,7 @@ function reportBase() {
 
 /**
  * A report category comes back as an object, but the value we need to put in
- * the URL path is its key/id (e.g. "technician"), not its display name.
- * Different tenants have surfaced this under slightly different property
- * names, so check all the plausible ones.
+ * the URL path is its key/id (e.g. "accounting"), not its display name.
  */
 function categoryKey(c) {
   if (!c) return null;
@@ -75,11 +73,7 @@ function categoryKey(c) {
   return c.id || c.key || c.value || c.name || null;
 }
 
-/**
- * List every report category this app has been approved to read.
- * If the app is scoped to one category, this returns exactly one entry —
- * which is itself a useful diagnostic.
- */
+/** List every report category this app has been approved to read. */
 async function listReportCategories() {
   const token = await getToken();
   const out = [];
@@ -103,10 +97,9 @@ async function listReportCategories() {
 }
 
 /**
- * List the reports inside one category.
- * A 403/404 here means "this app isn't approved for that category" rather
- * than a real failure, so return empty instead of throwing — otherwise one
- * locked category would abort the whole search.
+ * List the reports inside one category. A 403/404 means "this app isn't
+ * approved for that category" rather than a real failure, so return empty
+ * instead of throwing — otherwise one locked category aborts the whole search.
  */
 async function listReports(category, maxPages = 20) {
   const token = await getToken();
@@ -135,14 +128,7 @@ async function listReports(category, maxPages = 20) {
   return out;
 }
 
-/**
- * Find which category a given report ID lives in, by walking every category
- * the app can see. Stops as soon as it hits a match.
- *
- * This exists so nobody has to hunt through the ServiceTitan UI guessing at
- * category slugs. The `tried` array is deliberately returned even on success,
- * because when this fails you want to see exactly what was searched.
- */
+/** Find which category a given report ID lives in. Stops on first match. */
 async function findReport(reportId) {
   const target = String(reportId);
   const categories = await listReportCategories();
@@ -176,9 +162,43 @@ async function findReport(reportId) {
 }
 
 /**
- * Fetch the report's own definition: its fields and the parameters it requires.
- * This is what lets us stop guessing at parameter names.
+ * Resolve a dynamic value set — the numbered dropdowns a report uses.
+ *
+ * This matters more than it looks. A parameter like DateType is typed as
+ * "Number" with a dynamicSetId of "job-date-filter-type". Passing the wrong
+ * number doesn't error; it silently filters the report by a different date
+ * column, which produces an aging board that looks completely plausible and
+ * is completely wrong.
+ *
+ * Tries both path spellings because this endpoint has been documented both
+ * ways, and surfaces the failure clearly rather than guessing.
  */
+async function getDynamicSet(dynamicSetId) {
+  const token = await getToken();
+  const attempts = [
+    `${reportBase()}/dynamic-value-sets/${encodeURIComponent(dynamicSetId)}`,
+    `${reportBase()}/dynamic-value-set/${encodeURIComponent(dynamicSetId)}`,
+  ];
+
+  const errors = [];
+
+  for (const url of attempts) {
+    const res = await fetch(url, { headers: headers(token) });
+    if (res.ok) {
+      const json = await res.json();
+      return { url, raw: json, values: toObjects(json) };
+    }
+    const text = await res.text();
+    errors.push(`${url} → ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  throw new Error(
+    `Dynamic value set "${dynamicSetId}" could not be read. Attempts:\n` +
+      errors.join('\n')
+  );
+}
+
+/** Fetch the report's own definition: its fields and required parameters. */
 async function getReportMeta(category, reportId) {
   const token = await getToken();
   const url = `${reportBase()}/report-category/${category}/reports/${reportId}`;
@@ -191,12 +211,12 @@ async function getReportMeta(category, reportId) {
 }
 
 /**
- * Fetch report data. `parameters` is an array of { name, value }.
+ * Fetch one page of report data. `parameters` is an array of { name, value }.
  * Returns { fields, rows } where rows are plain objects keyed by field name.
  */
-async function getReportData(category, reportId, parameters, pageSize = 500) {
+async function getReportData(category, reportId, parameters, pageSize = 500, page = 1) {
   const token = await getToken();
-  const url = `${reportBase()}/report-category/${category}/reports/${reportId}/data?page=1&pageSize=${pageSize}&includeTotal=true`;
+  const url = `${reportBase()}/report-category/${category}/reports/${reportId}/data?page=${page}&pageSize=${pageSize}&includeTotal=true`;
 
   const res = await fetch(url, {
     method: 'POST',
@@ -211,6 +231,39 @@ async function getReportData(category, reportId, parameters, pageSize = 500) {
 
   const json = await res.json();
   return { raw: json, fields: json.fields || [], rows: toObjects(json) };
+}
+
+/**
+ * Fetch every page of report data.
+ *
+ * A single page caps at 500 rows. An AR report reaching back years will blow
+ * past that, and a truncated feed would silently drop the oldest balances —
+ * exactly the ones the board exists to surface. maxPages is a runaway guard,
+ * and hitPageLimit is returned so the caller can warn instead of lying.
+ */
+async function getReportDataAll(category, reportId, parameters, pageSize = 500, maxPages = 20) {
+  const all = [];
+  let fields = [];
+  let pagesFetched = 0;
+  let hitPageLimit = false;
+
+  for (let page = 1; page <= maxPages; page++) {
+    const { raw, fields: f, rows } = await getReportData(
+      category,
+      reportId,
+      parameters,
+      pageSize,
+      page
+    );
+    if (page === 1) fields = f;
+    all.push(...rows);
+    pagesFetched = page;
+
+    if (!raw.hasMore) break;
+    if (page === maxPages) hitPageLimit = true;
+  }
+
+  return { fields, rows: all, pagesFetched, hitPageLimit };
 }
 
 /**
@@ -237,9 +290,12 @@ module.exports = {
   getToken,
   getReportMeta,
   getReportData,
+  getReportDataAll,
+  getDynamicSet,
   listReportCategories,
   listReports,
   findReport,
   categoryKey,
+  toObjects,
   env,
 };
