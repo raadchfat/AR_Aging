@@ -23,9 +23,13 @@
     "refreshMinutes": 15,
     "compareDaysAgo": 7,
 
-    "_minBalanceNote": "Balances below this never reach the worklist. Raise it if the bottom of the list stops being worth a phone call.",
-    "minBalance": 25,
-    "worklistSize": 20,
+    "_worklistNote": "The worklist ranks by PAST DUE money, not by total owed. Sorting by total owed puts customers at the top who were invoiced two weeks ago and owe nothing late — a collections person would spend the morning calling people who are not late. 'basis' is which columns count as past due; the default is everything 31 days and older, matching the first gauge.",
+    "worklist": {
+      "basis": ["Aging60", "Aging90", "Aging120", "AgingPast120"],
+      "columnLabel": "Past Due",
+      "minPastDue": 100,
+      "size": 20
+    },
 
     "privacy": {
       "_note": "nameStyle: full | initial | hidden. This screen sits at one desk facing a wall, so full is appropriate. Change to initial if it ever moves somewhere customers can see it.",
@@ -88,7 +92,7 @@
 
     "_checklistNote": "Plain text, edit freely. Shows along the bottom of the screen.",
     "checklist": [
-      "Work the list top down — biggest balance first, always",
+      "Work the list top down — biggest PAST DUE first, always",
       "Log every call in ServiceTitan, even the no-answers",
       "Text or email a payment link on any no-answer before moving on",
       "Anything over $2,000: get a payment date on the calendar, not a promise",
