@@ -40,8 +40,7 @@
     "membership": {
       "enabled": true,
       "label": "Membership Dues",
-      "note": "$99 recurring charge that failed to bill. Billing fix, not a collections call.",
-      "owner": "Unassigned — set this",
+      "note": "Membership dues to clean up. Billing fix, not a collections call.",
       "amounts": [99.0, 99.51, 105.93, 198.0, 204.93, 211.86],
       "tolerance": 0.02
     },
