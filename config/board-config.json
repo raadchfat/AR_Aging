@@ -4,25 +4,30 @@
   "timezone": "America/Chicago",
 
   "report": {
-    "_comment": "Leave category null and the discovery endpoint will find it for you, then paste the value it reports back in here.",
-    "category": null,
-    "id": 50188174,
-    "parameterOverrides": {}
+    "_comment": "ServiceTitan report 435, 'AR Transactions By Customer'. Already summarized per customer with ServiceTitan's own aging math.",
+    "category": "accounting",
+    "id": 435,
+
+    "_parametersNote": "These mirror the checkboxes as they were set in the ServiceTitan UI. AsOfDate is left out on purpose so the report always runs as of today rather than a frozen date.",
+    "parameters": {
+      "ExcludeIncompleteJobs": true,
+      "ExcludeZeroNetBalanceInvoices": true,
+      "ArRollUpView": true,
+      "ExcludeUnappliedPayments": false
+    }
   },
 
   "ar": {
-    "granularity": "customer",
-    "agingBasis": "completionDate",
-
-    "_bucketModeNote": "exclusive = a customer appears on exactly one view (90+, 60-89, 30-59). nested = 90+, 60+, 30+, so a 200-day-old balance shows on all three.",
-    "bucketMode": "exclusive",
+    "_bucketNote": "These map to ServiceTitan's own aging columns. Do not invent 30/60/90 boundaries that disagree with them — the whole point of using this report is that accounting already agreed on where the lines are. A customer with money in more than one column will appear on more than one view, showing that column's amount each time. That is correct, not a bug.",
     "buckets": [
-      { "key": "b90", "label": "90+ Days", "minDays": 90, "maxDays": null },
-      { "key": "b60", "label": "60-89 Days", "minDays": 60, "maxDays": 89 },
-      { "key": "b30", "label": "30-59 Days", "minDays": 30, "maxDays": 59 }
+      { "key": "b91", "label": "91+ Days", "fields": ["Aging120", "AgingPast120"] },
+      { "key": "b61", "label": "61 - 90 Days", "fields": ["Aging90"] },
+      { "key": "b31", "label": "31 - 60 Days", "fields": ["Aging60"] }
     ],
 
-    "_sortNote": "balance = biggest money first. days = oldest first.",
+    "_balanceNote": "The 'Total' field in this report is INVOICE TOTAL, not amount owed. A customer can show a $14,602 Total while owing $105.93. Never display Total as a balance. Amount owed = sum of the aging columns.",
+
+    "_sortNote": "balance = biggest money in that bucket first. name = alphabetical.",
     "sortBy": "balance",
 
     "cardsPerView": 12,
@@ -31,12 +36,11 @@
     "refreshMinutes": 15,
 
     "privacy": {
-      "_note": "nameStyle: full | initial | hidden. Set to initial if anyone who is not an employee can see this screen.",
-      "nameStyle": "full",
-      "showInvoiceNumber": true
+      "_note": "nameStyle: full | initial | hidden. Use initial if anyone who is not an employee can see this screen.",
+      "nameStyle": "full"
     },
 
-    "_collectorsNote": "Optional. Maps a customer name exactly as it appears in ServiceTitan to whoever owns collecting it. Leave empty until the board is running.",
+    "_collectorsNote": "This report does not carry technician or sold-by data, so collector assignment has to be maintained here by hand. Map the customer name exactly as ServiceTitan spells it.",
     "collectors": {}
   }
 }
