@@ -8,8 +8,8 @@
 
 # Friendlier URLs for the board to call
 [[redirects]]
-  from = "/api/feed"
-  to = "/.netlify/functions/board-feed"
+  from = "/api/ar"
+  to = "/.netlify/functions/ar-feed"
   status = 200
 
 [[redirects]]
