@@ -72,6 +72,8 @@
   td.rk{color:var(--ink-3);font-size:13px;width:26px}
   td.nm{font-weight:600;max-width:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   td.ow{font-weight:700}
+  td.tot{color:var(--ink-3);font-size:13px}
+  td.tot .same{color:#c3c2be}
   td.bk{color:var(--ink-2);font-size:13px;white-space:nowrap}
   td.ck{width:34px;text-align:center}
   input[type=checkbox]{width:17px;height:17px;cursor:pointer;accent-color:var(--good)}
@@ -119,7 +121,8 @@
     <table>
       <thead><tr>
         <th style="width:26px"></th><th>Customer</th>
-        <th class="r">Owed</th><th class="r">Oldest</th><th class="r" style="width:34px">Done</th>
+        <th class="r" id="pdHead">Past Due</th><th class="r">Total Owed</th>
+        <th class="r">Oldest</th><th class="r" style="width:34px">Done</th>
       </tr></thead>
       <tbody id="worklist"></tbody>
     </table>
@@ -212,9 +215,11 @@ function renderWorklist(d){
   const day = d.asOfDate, done = getDone(day);
   const tb = document.getElementById('worklist');
 
+  document.getElementById('pdHead').textContent = d.worklistLabel || 'Past Due';
+
   if(!d.worklist.length){
-    tb.innerHTML = `<tr><td colspan="5" style="padding:26px 8px" class="good-news">
-      Nothing above ${money(d.worklistOverflow.minBalance)} to chase. Enjoy it.</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="6" style="padding:26px 8px" class="good-news">
+      Nothing past due above ${money(d.worklistOverflow.minPastDue)}. Enjoy it.</td></tr>`;
     document.getElementById('overflow').textContent = '';
     document.getElementById('worklistHint').textContent = '';
     return;
@@ -222,10 +227,16 @@ function renderWorklist(d){
 
   tb.innerHTML = d.worklist.map(w => {
     const isDone = done.has(w.name);
+    // Total is shown greyed and only when it differs — so the caller knows to
+    // ask about the past-due portion, not the whole balance.
+    const total = w.hasCurrentToo
+      ? `<span title="Total balance including invoices not yet past due">${moneyExact(w.totalOwed)}</span>`
+      : '<span class="same">same</span>';
     return `<tr class="${isDone?'done':''}" data-name="${escapeAttr(w.name)}">
       <td class="rk">${w.rank}</td>
       <td class="nm" title="${escapeAttr(w.name)}">${escapeHTML(w.name)}</td>
-      <td class="r ow">${moneyExact(w.owed)}</td>
+      <td class="r ow">${moneyExact(w.pastDue)}</td>
+      <td class="r tot">${total}</td>
       <td class="r bk">${w.oldestBucket}</td>
       <td class="ck"><input type="checkbox" ${isDone?'checked':''} aria-label="Called ${escapeAttr(w.name)}"></td>
     </tr>`;
@@ -244,8 +255,8 @@ function renderWorklist(d){
   updateHint(d);
   const o = d.worklistOverflow;
   document.getElementById('overflow').textContent = o.customersNotShown > 0
-    ? `${o.customersNotShown} more accounts below this list, ${money(o.amountNotShown)} between them. Balances under ${money(o.minBalance)} are not listed.`
-    : 'This is every account above the minimum balance.';
+    ? `${o.customersNotShown} more past-due accounts below this list, ${money(o.amountNotShown)} between them. Anything under ${money(o.minPastDue)} past due is not listed.`
+    : 'This is every past-due account above the minimum.';
 }
 
 function updateHint(d){
