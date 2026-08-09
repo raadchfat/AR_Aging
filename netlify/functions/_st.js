@@ -64,6 +64,118 @@ function reportBase() {
 }
 
 /**
+ * A report category comes back as an object, but the value we need to put in
+ * the URL path is its key/id (e.g. "technician"), not its display name.
+ * Different tenants have surfaced this under slightly different property
+ * names, so check all the plausible ones.
+ */
+function categoryKey(c) {
+  if (!c) return null;
+  if (typeof c === 'string') return c;
+  return c.id || c.key || c.value || c.name || null;
+}
+
+/**
+ * List every report category this app has been approved to read.
+ * If the app is scoped to one category, this returns exactly one entry —
+ * which is itself a useful diagnostic.
+ */
+async function listReportCategories() {
+  const token = await getToken();
+  const out = [];
+
+  for (let page = 1; page <= 20; page++) {
+    const url = `${reportBase()}/report-categories?page=${page}&pageSize=100`;
+    const res = await fetch(url, { headers: headers(token) });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Category list failed (${res.status}): ${text.slice(0, 400)}`);
+    }
+
+    const json = await res.json();
+    const data = json.data || json.items || (Array.isArray(json) ? json : []);
+    out.push(...data);
+    if (!json.hasMore) break;
+  }
+
+  return out;
+}
+
+/**
+ * List the reports inside one category.
+ * A 403/404 here means "this app isn't approved for that category" rather
+ * than a real failure, so return empty instead of throwing — otherwise one
+ * locked category would abort the whole search.
+ */
+async function listReports(category, maxPages = 20) {
+  const token = await getToken();
+  const out = [];
+
+  for (let page = 1; page <= maxPages; page++) {
+    const url = `${reportBase()}/report-category/${encodeURIComponent(
+      category
+    )}/reports?page=${page}&pageSize=200`;
+    const res = await fetch(url, { headers: headers(token) });
+
+    if (res.status === 403 || res.status === 404) return out;
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(
+        `Report list failed for "${category}" (${res.status}): ${text.slice(0, 400)}`
+      );
+    }
+
+    const json = await res.json();
+    const data = json.data || json.items || [];
+    out.push(...data);
+    if (!json.hasMore) break;
+  }
+
+  return out;
+}
+
+/**
+ * Find which category a given report ID lives in, by walking every category
+ * the app can see. Stops as soon as it hits a match.
+ *
+ * This exists so nobody has to hunt through the ServiceTitan UI guessing at
+ * category slugs. The `tried` array is deliberately returned even on success,
+ * because when this fails you want to see exactly what was searched.
+ */
+async function findReport(reportId) {
+  const target = String(reportId);
+  const categories = await listReportCategories();
+  const tried = [];
+
+  for (const c of categories) {
+    const key = categoryKey(c);
+    if (!key) continue;
+
+    let reports = [];
+    try {
+      reports = await listReports(key);
+    } catch (err) {
+      tried.push({ category: key, error: err.message });
+      continue;
+    }
+
+    tried.push({ category: key, reportCount: reports.length });
+
+    const hit = reports.find((r) => String(r.id) === target);
+    if (hit) return { found: true, category: key, report: hit, tried };
+  }
+
+  return {
+    found: false,
+    category: null,
+    report: null,
+    tried,
+    categories: categories.map(categoryKey),
+  };
+}
+
+/**
  * Fetch the report's own definition: its fields and the parameters it requires.
  * This is what lets us stop guessing at parameter names.
  */
@@ -121,4 +233,13 @@ function toObjects(json) {
   });
 }
 
-module.exports = { getToken, getReportMeta, getReportData, env };
+module.exports = {
+  getToken,
+  getReportMeta,
+  getReportData,
+  listReportCategories,
+  listReports,
+  findReport,
+  categoryKey,
+  env,
+};
