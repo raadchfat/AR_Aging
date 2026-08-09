@@ -1,80 +1,42 @@
 {
-  "_comment": "Everything you'd otherwise ask Claude to edit lives here. Change it, commit, Netlify redeploys in ~30 seconds.",
+  "_comment": "AR Aging TV board config. Edit this file, commit it, and Netlify redeploys in about 30 seconds. Nothing secret belongs in here.",
 
   "timezone": "America/Chicago",
-  "workDays": [1, 2, 3, 4, 5, 6],
-  "prorateTargets": true,
 
   "report": {
-    "category": "technician",
-    "id": 58711699,
+    "_comment": "Leave category null and the discovery endpoint will find it for you, then paste the value it reports back in here.",
+    "category": null,
+    "id": 50188174,
     "parameterOverrides": {}
   },
 
-  "boards": {
-    "order": ["service", "install"],
-    "titles": {
-      "service": "Service",
-      "install": "Install",
-      "sales": "Sales"
+  "ar": {
+    "granularity": "customer",
+    "agingBasis": "completionDate",
+
+    "_bucketModeNote": "exclusive = a customer appears on exactly one view (90+, 60-89, 30-59). nested = 90+, 60+, 30+, so a 200-day-old balance shows on all three.",
+    "bucketMode": "exclusive",
+    "buckets": [
+      { "key": "b90", "label": "90+ Days", "minDays": 90, "maxDays": null },
+      { "key": "b60", "label": "60-89 Days", "minDays": 60, "maxDays": 89 },
+      { "key": "b30", "label": "30-59 Days", "minDays": 30, "maxDays": 59 }
+    ],
+
+    "_sortNote": "balance = biggest money first. days = oldest first.",
+    "sortBy": "balance",
+
+    "cardsPerView": 12,
+    "minBalance": 100,
+    "rotationSeconds": 20,
+    "refreshMinutes": 15,
+
+    "privacy": {
+      "_note": "nameStyle: full | initial | hidden. Set to initial if anyone who is not an employee can see this screen.",
+      "nameStyle": "full",
+      "showInvoiceNumber": true
     },
-    "unitMatch": {
-      "service": ["Service"],
-      "install": ["Install"],
-      "sales": ["Sales"]
-    }
-  },
 
-  "targets": {
-    "service": { "monthlyRevenue": 0 },
-    "install": { "monthlyRevenue": 0 },
-    "sales": { "monthlyRevenue": 0 }
-  },
-
-  "exclude": ["Cody Hobbs", "Rod Chfat Field"],
-
-  "assign": {},
-
-  "forceShow": {
-    "Brandon Tibbott": "service",
-    "Steve Springer": "service",
-    "Dalton Jones": "service",
-    "Jamison Gruber": "service",
-    "William Smith": "service",
-    "Dylan Maet": "service",
-    "Colton Bennett": "install",
-    "Manny Martinez": "install",
-    "Jackson Field": "install",
-    "David Solokhin": "install",
-    "Danik Pidchenko": "install",
-    "Andrei Grachev": "install",
-    "Nicholas Rivera": "install",
-    "Zachary Holman": "install"
-  },
-
-  "roleDefault": "Technician",
-  "roles": {
-    "Colton Bennett": "Lead",
-    "Manny Martinez": "Lead",
-    "Jackson Field": "Lead",
-    "David Solokhin": "Subcontractor",
-    "Dylan Maet": "Technician"
-  },
-
-  "photos": {
-    "Brandon Tibbott": "photos/brandon-tibbott.jpg",
-    "Steve Springer": "photos/steve-springer.jpg",
-    "Dalton Jones": "photos/dalton-jones.jpg",
-    "Jamison Gruber": "photos/jamison-gruber.jpg",
-    "William Smith": "photos/william-smith.jpg",
-    "Dylan Maet": "photos/dylan-maet.jpg",
-    "Colton Bennett": "photos/colton-bennett.jpg",
-    "Manny Martinez": "photos/manny-martinez.jpg",
-    "Jackson Field": "photos/jackson-field.jpg",
-    "David Solokhin": "photos/david-solokhin.jpg",
-    "Danik Pidchenko": "photos/danik-pidchenko.jpg",
-    "Andrei Grachev": "photos/andrei-grachev.jpg",
-    "Nicholas Rivera": "photos/nicholas-rivera.jpg",
-    "Zachary Holman": "photos/zachary-holman.jpg"
+    "_collectorsNote": "Optional. Maps a customer name exactly as it appears in ServiceTitan to whoever owns collecting it. Leave empty until the board is running.",
+    "collectors": {}
   }
 }
