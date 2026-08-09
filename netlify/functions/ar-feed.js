@@ -26,6 +26,30 @@ const AGING = ['Current', 'Aging30', 'Aging60', 'Aging90', 'Aging120', 'AgingPas
 
 let cache = { at: 0, payload: null };
 
+// Last week's snapshot is cached separately and for far longer, because the
+// numbers as of a fixed past date do not change. Without this, every refresh
+// fired two report calls back to back against a five-per-minute ceiling and
+// the comparison was the thing that got rate-limited away.
+let priorCache = { date: '', snap: null, failedAt: 0 };
+
+async function getPrior(priorDate) {
+  if (priorCache.date === priorDate && priorCache.snap) {
+    return { snap: priorCache.snap, error: null };
+  }
+  if (priorCache.date === priorDate && Date.now() - priorCache.failedAt < 5 * 60 * 1000) {
+    return { snap: null, error: 'Comparison unavailable — retrying in a few minutes.' };
+  }
+  try {
+    const snap = await snapshot(priorDate);
+    priorCache = { date: priorDate, snap, failedAt: 0 };
+    return { snap, error: null };
+  } catch (err) {
+    const keep = priorCache.date === priorDate ? priorCache.snap : null;
+    priorCache = { date: priorDate, snap: keep, failedAt: Date.now() };
+    return { snap: keep, error: err.message };
+  }
+}
+
 exports.handler = async (event) => {
   const q = (event && event.queryStringParameters) || {};
   const debug = q.debug === '1';
@@ -50,13 +74,7 @@ exports.handler = async (event) => {
     // earlier AsOfDate rather than from stored history — no database, and the
     // comparison uses ServiceTitan's numbers on both ends. If the historical
     // run fails for any reason, the board drops the delta rather than the data.
-    let prior = null;
-    let priorError = null;
-    try {
-      prior = await snapshot(priorDate);
-    } catch (err) {
-      priorError = err.message;
-    }
+    const { snap: prior, error: priorError } = await getPrior(priorDate);
 
     const payload = build(current, prior, today, priorDate, priorError, debug);
     cache = { at: Date.now(), payload };
@@ -168,22 +186,32 @@ function build(cur, prior, today, priorDate, priorError, debug) {
     (e) => slipCfg.fields.reduce((s, f) => s + Math.max(0, e.cols[f] || 0), 0) > 0
   );
 
-  const minBalance = cfg.ar.minBalance || 0;
-  const worklist = cur.real
-    .filter((e) => e.owed >= minBalance)
-    .sort((a, b) => b.owed - a.owed)
-    .slice(0, cfg.ar.worklistSize || 20)
-    .map((e, i) => ({
-      rank: i + 1,
-      name: displayName(e.name),
-      owed: e.owed,
-      oldestBucket: oldestBucketLabel(e.cols),
-      over90: round2(Math.max(0, e.cols.Aging120 || 0) + Math.max(0, e.cols.AgingPast120 || 0)),
-    }));
+  // Rank by past-due money, never by total owed. A customer invoiced $30,500
+  // two weeks ago owes nothing late and does not belong on a collections
+  // worklist — sorting by total put five such customers in the top twenty
+  // and pushed real past-due accounts off the screen entirely.
+  const wcfg = cfg.ar.worklist || {};
+  const basis = wcfg.basis || ['Aging60', 'Aging90', 'Aging120', 'AgingPast120'];
+  const minPastDue = wcfg.minPastDue || 0;
 
-  const eligible = cur.real.filter((e) => e.owed >= minBalance);
-  const shown = worklist.reduce((s, e) => s + e.owed, 0);
-  const notShownTotal = round2(eligible.reduce((s, e) => s + e.owed, 0) - shown);
+  const withPastDue = cur.real
+    .map((e) => ({ ...e, pastDue: round2(basis.reduce((s, f) => s + Math.max(0, e.cols[f] || 0), 0)) }))
+    .filter((e) => e.pastDue >= minPastDue)
+    .sort((a, b) => b.pastDue - a.pastDue);
+
+  const worklist = withPastDue.slice(0, wcfg.size || 20).map((e, i) => ({
+    rank: i + 1,
+    name: displayName(e.name),
+    pastDue: e.pastDue,
+    totalOwed: e.owed,
+    // Flagged so the board can say so out loud: this customer owes more than
+    // is actually late, and the caller should ask about the past-due part only.
+    hasCurrentToo: e.owed - e.pastDue > 0.5,
+    oldestBucket: oldestBucketLabel(e.cols),
+  }));
+
+  const shown = worklist.reduce((s, e) => s + e.pastDue, 0);
+  const notShownTotal = round2(withPastDue.reduce((s, e) => s + e.pastDue, 0) - shown);
 
   const membershipTotal = round2(cur.membership.reduce((s, e) => s + e.owed, 0));
   const mcfg = cfg.ar.membership || {};
@@ -237,10 +265,11 @@ function build(cur, prior, today, priorDate, priorError, debug) {
     },
 
     worklist,
+    worklistLabel: wcfg.columnLabel || 'Past Due',
     worklistOverflow: {
-      customersNotShown: Math.max(0, eligible.length - worklist.length),
+      customersNotShown: Math.max(0, withPastDue.length - worklist.length),
       amountNotShown: notShownTotal < 0 ? 0 : notShownTotal,
-      minBalance,
+      minPastDue,
     },
 
     checklist: cfg.ar.checklist || [],
