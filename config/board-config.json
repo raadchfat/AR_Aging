@@ -1,14 +1,13 @@
 {
-  "_comment": "AR Aging TV board config. Edit this file, commit it, and Netlify redeploys in about 30 seconds. Nothing secret belongs in here.",
+  "_comment": "AR board config. Edit, commit, Netlify redeploys in ~30 seconds. Nothing secret belongs in here.",
 
   "timezone": "America/Chicago",
 
   "report": {
-    "_comment": "ServiceTitan report 435, 'AR Transactions By Customer'. Already summarized per customer with ServiceTitan's own aging math.",
+    "_comment": "ServiceTitan report 435, 'OD - AR Transactions By Customer'. Customer-level, ServiceTitan's own aging math.",
     "category": "accounting",
     "id": 435,
-
-    "_parametersNote": "These mirror the checkboxes as they were set in the ServiceTitan UI. AsOfDate is left out on purpose so the report always runs as of today rather than a frozen date.",
+    "_parametersNote": "Mirrors the checkboxes as set in the ServiceTitan UI. AsOfDate is added by the feed at runtime so the report is never frozen to a stale date.",
     "parameters": {
       "ExcludeIncompleteJobs": true,
       "ExcludeZeroNetBalanceInvoices": true,
@@ -18,29 +17,83 @@
   },
 
   "ar": {
-    "_bucketNote": "These map to ServiceTitan's own aging columns. Do not invent 30/60/90 boundaries that disagree with them — the whole point of using this report is that accounting already agreed on where the lines are. A customer with money in more than one column will appear on more than one view, showing that column's amount each time. That is correct, not a bug.",
-    "buckets": [
-      { "key": "b91", "label": "91+ Days", "fields": ["Aging120", "AgingPast120"] },
-      { "key": "b61", "label": "61 - 90 Days", "fields": ["Aging90"] },
-      { "key": "b31", "label": "31 - 60 Days", "fields": ["Aging60"] }
-    ],
+    "title": "ACCOUNTS RECEIVABLE",
+    "subtitle": "Omaha Drain",
 
-    "_balanceNote": "The 'Total' field in this report is INVOICE TOTAL, not amount owed. A customer can show a $14,602 Total while owing $105.93. Never display Total as a balance. Amount owed = sum of the aging columns.",
-
-    "_sortNote": "balance = biggest money in that bucket first. name = alphabetical.",
-    "sortBy": "balance",
-
-    "cardsPerView": 12,
-    "minBalance": 100,
-    "rotationSeconds": 20,
     "refreshMinutes": 15,
+    "compareDaysAgo": 7,
+
+    "_minBalanceNote": "Balances below this never reach the worklist. Raise it if the bottom of the list stops being worth a phone call.",
+    "minBalance": 25,
+    "worklistSize": 20,
 
     "privacy": {
-      "_note": "nameStyle: full | initial | hidden. Use initial if anyone who is not an employee can see this screen.",
+      "_note": "nameStyle: full | initial | hidden. This screen sits at one desk facing a wall, so full is appropriate. Change to initial if it ever moves somewhere customers can see it.",
       "nameStyle": "full"
     },
 
-    "_collectorsNote": "This report does not carry technician or sold-by data, so collector assignment has to be maintained here by hand. Map the customer name exactly as ServiceTitan spells it.",
-    "collectors": {}
+    "_membershipNote": "A $99 recurring charge that failed to bill, appearing as identical balances across hundreds of accounts. These are a billing fix, not collections calls, so they are pulled out of the aging math entirely and shown as one tile. Matching is by exact amount because report 435 carries no membership field — watch the customer count on the tile; if it drifts, the amount list needs updating.",
+    "membership": {
+      "enabled": true,
+      "label": "Membership Dues",
+      "note": "$99 recurring charge that failed to bill. Billing fix, not a collections call.",
+      "owner": "Unassigned — set this",
+      "amounts": [99.0, 99.51, 105.93, 198.0, 204.93, 211.86],
+      "tolerance": 0.02
+    },
+
+    "_gaugeNote": "Cumulative, not per-bucket: 'over 60' includes everything 61 days and older. Lower is better on all three, which is what makes one set of thresholds valid across all of them. Membership dues are excluded from both the top and bottom of every ratio.",
+    "gauges": [
+      {
+        "key": "over30",
+        "label": "Over 30 Days",
+        "fields": ["Aging60", "Aging90", "Aging120", "AgingPast120"]
+      },
+      {
+        "key": "over60",
+        "label": "Over 60 Days",
+        "fields": ["Aging90", "Aging120", "AgingPast120"]
+      },
+      {
+        "key": "over90",
+        "label": "Over 90 Days",
+        "fields": ["Aging120", "AgingPast120"]
+      }
+    ],
+
+    "_bandsNote": "Percent of receivables past that mark. At or below goodMax is green, up to warnMax is orange, at or above warnMax is red.",
+    "bands": { "goodMax": 20, "warnMax": 50 },
+    "bandLabels": { "good": "ON TRACK", "warn": "WATCH", "bad": "CRITICAL" },
+
+    "slipping": {
+      "label": "Slipping",
+      "sublabel": "31 - 90 days",
+      "fields": ["Aging60", "Aging90"],
+      "emptyMessage": "Nothing slipping. This is the win."
+    },
+
+    "oldest": {
+      "label": "Over 90 Days",
+      "fields": ["Aging120", "AgingPast120"]
+    },
+
+    "bucketLabels": {
+      "Current": "Current",
+      "Aging30": "1 - 30",
+      "Aging60": "31 - 60",
+      "Aging90": "61 - 90",
+      "Aging120": "91 - 120",
+      "AgingPast120": "121+"
+    },
+
+    "_checklistNote": "Plain text, edit freely. Shows along the bottom of the screen.",
+    "checklist": [
+      "Work the list top down — biggest balance first, always",
+      "Log every call in ServiceTitan, even the no-answers",
+      "Text or email a payment link on any no-answer before moving on",
+      "Anything over $2,000: get a payment date on the calendar, not a promise",
+      "New name in Slipping? Call it this week, before it turns 90",
+      "End of day: mark what you collected and what needs a callback"
+    ]
   }
 }
