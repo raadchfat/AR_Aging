@@ -1,0 +1,80 @@
+{
+  "_comment": "Everything you'd otherwise ask Claude to edit lives here. Change it, commit, Netlify redeploys in ~30 seconds.",
+
+  "timezone": "America/Chicago",
+  "workDays": [1, 2, 3, 4, 5, 6],
+  "prorateTargets": true,
+
+  "report": {
+    "category": "technician",
+    "id": 58711699,
+    "parameterOverrides": {}
+  },
+
+  "boards": {
+    "order": ["service", "install"],
+    "titles": {
+      "service": "Service",
+      "install": "Install",
+      "sales": "Sales"
+    },
+    "unitMatch": {
+      "service": ["Service"],
+      "install": ["Install"],
+      "sales": ["Sales"]
+    }
+  },
+
+  "targets": {
+    "service": { "monthlyRevenue": 0 },
+    "install": { "monthlyRevenue": 0 },
+    "sales": { "monthlyRevenue": 0 }
+  },
+
+  "exclude": ["Cody Hobbs", "Rod Chfat Field"],
+
+  "assign": {},
+
+  "forceShow": {
+    "Brandon Tibbott": "service",
+    "Steve Springer": "service",
+    "Dalton Jones": "service",
+    "Jamison Gruber": "service",
+    "William Smith": "service",
+    "Dylan Maet": "service",
+    "Colton Bennett": "install",
+    "Manny Martinez": "install",
+    "Jackson Field": "install",
+    "David Solokhin": "install",
+    "Danik Pidchenko": "install",
+    "Andrei Grachev": "install",
+    "Nicholas Rivera": "install",
+    "Zachary Holman": "install"
+  },
+
+  "roleDefault": "Technician",
+  "roles": {
+    "Colton Bennett": "Lead",
+    "Manny Martinez": "Lead",
+    "Jackson Field": "Lead",
+    "David Solokhin": "Subcontractor",
+    "Dylan Maet": "Technician"
+  },
+
+  "photos": {
+    "Brandon Tibbott": "photos/brandon-tibbott.jpg",
+    "Steve Springer": "photos/steve-springer.jpg",
+    "Dalton Jones": "photos/dalton-jones.jpg",
+    "Jamison Gruber": "photos/jamison-gruber.jpg",
+    "William Smith": "photos/william-smith.jpg",
+    "Dylan Maet": "photos/dylan-maet.jpg",
+    "Colton Bennett": "photos/colton-bennett.jpg",
+    "Manny Martinez": "photos/manny-martinez.jpg",
+    "Jackson Field": "photos/jackson-field.jpg",
+    "David Solokhin": "photos/david-solokhin.jpg",
+    "Danik Pidchenko": "photos/danik-pidchenko.jpg",
+    "Andrei Grachev": "photos/andrei-grachev.jpg",
+    "Nicholas Rivera": "photos/nicholas-rivera.jpg",
+    "Zachary Holman": "photos/zachary-holman.jpg"
+  }
+}

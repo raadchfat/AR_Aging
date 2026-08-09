@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Omaha Drain — Division Boards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Archivo+Expanded:wght@700;800;900&display=swap" rel="stylesheet">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#F5F7F6; --card:#FFFFFF; --line:#E3E9E6;
+    --ink:#101614; --ink-dim:#66736E;
+    --teal:#12A683; --green:#2FBF7B; --red:#F0625D; --gold:#F5B62E;
+    --fill-g:#D6F2E2; --ink-g:#0E7A52; --fill-r:#FDDCDA; --ink-r:#C4433D;
+    --fill-n:#F2F5F3; --ink-n:#8B958F;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:'Archivo',sans-serif;overflow:hidden}
+  body.idle{cursor:none}
+  .stage{height:100vh;display:flex;flex-direction:column;padding:2vh 2vw;gap:1.4vh}
+
+  header{display:flex;align-items:flex-end;justify-content:space-between}
+  .title{font-family:'Archivo Expanded',sans-serif;font-weight:900;font-size:4.6vh;letter-spacing:.02em;text-transform:uppercase;line-height:1}
+  .subtitle{font-size:1.9vh;font-weight:600;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.14em;margin-top:.8vh}
+  .subtitle b{color:var(--teal)}
+  .meta{text-align:right;color:var(--ink-dim);font-size:1.9vh;font-weight:600;text-transform:uppercase;letter-spacing:.1em}
+  .meta .clock{font-size:2.8vh;color:var(--ink);font-weight:800}
+
+  .boards{flex:1;display:grid;grid-template-columns:25vw 1fr;gap:1.3vw;min-height:0}
+  .grid{display:grid;grid-auto-rows:1fr;gap:1.1vh 1vw;min-height:0}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:1.6vh;
+    padding:1.5vh 1.1vw;display:flex;flex-direction:column;gap:.9vh;min-height:0;
+    box-shadow:0 2px 10px rgba(16,22,20,.05);position:relative;overflow:hidden;
+  }
+  .rankchip{position:absolute;top:1.1vh;right:.9vw;background:var(--teal);color:#fff;font-weight:800;font-size:1.7vh;padding:.3vh .7vw;border-radius:.8vh}
+  .card.featured .rankchip{background:var(--gold);color:#3A2B00}
+
+  .head{display:flex;align-items:center;gap:.8vw;min-width:0}
+  .avatar{width:12vh;height:12vh;border-radius:1.4vh;flex:none;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:4.4vh;object-fit:cover;overflow:hidden}
+  img.avatar{background:#DDE5E2}
+  .who{min-width:0}
+  .name{font-weight:800;font-size:2.3vh;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .role{font-size:1.5vh;font-weight:600;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.1em}
+
+  .bigstat{margin-top:auto}
+  .bigstat .label{font-size:1.5vh;font-weight:700;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.12em}
+  .bigstat .val{font-family:'Archivo Expanded',sans-serif;font-weight:800;font-size:3.1vh;line-height:1.15}
+  .bigstat .val .tgt{color:var(--ink-dim);font-size:2vh;font-weight:700}
+  .good{color:var(--green)}
+  .bad{color:var(--red)}
+
+  .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:.5vh .4vw}
+  .tiles.t3{grid-template-columns:repeat(3,1fr)}
+  .tile{border-radius:1vh;padding:.8vh .4vw;text-align:center;color:#fff}
+  .tile.good{background:var(--green)}
+  .tile.bad{background:var(--red)}
+  .tile.na{background:#B9C4BF}
+  .fineprint{
+    font-size:1.5vh;font-weight:600;color:var(--ink-dim);
+    letter-spacing:.03em;line-height:1.5;
+    border-top:1px solid var(--line);padding-top:1vh;
+  }
+  .fineprint b{color:var(--ink);text-transform:uppercase;letter-spacing:.06em}
+  .tile .t-label{font-size:1.25vh;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.92;white-space:nowrap;overflow:hidden}
+  .tile .t-val{font-weight:800;font-size:1.9vh;line-height:1.25;white-space:nowrap}
+
+  .card.featured{border:2px solid var(--gold);padding:2vh 1.3vw;gap:1.2vh}
+  .card.featured .avatar{width:100%;height:38vh;aspect-ratio:auto;object-fit:cover;object-position:50% 15%;border-radius:1.4vh;font-size:8vh}
+  .card.featured .head{flex-direction:column;align-items:stretch;gap:1.1vh}
+  .card.featured .name{font-size:3.2vh;white-space:normal}
+  .card.featured .bigstat .val{font-size:4.2vh}
+  .card.featured .tile .t-val{font-size:2.2vh}
+
+
+  /* ===== SERVICE BOARD v2 — datacube-style card ===== */
+  .card.v2{padding:1.3vh .95vw;gap:.85vh;justify-content:flex-start}
+  .card.v2 .rankchip{display:none}
+  .card.v2 .v2head{display:flex;align-items:flex-start;justify-content:space-between;gap:.5vw}
+  .card.v2 .v2who{min-width:0}
+  .card.v2 .v2name{font-weight:800;font-size:2.15vh;text-transform:uppercase;letter-spacing:.01em;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card.v2 .v2role{font-size:1.35vh;font-weight:600;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.06em;margin-top:.3vh;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card.v2 .v2rank{font-weight:800;font-size:2.1vh;color:var(--ink);flex:none;line-height:1.05}
+  .card.v2 .v2bar{display:flex;align-items:center;justify-content:space-between;gap:.5vw;border-radius:.85vh;padding:.7vh .75vw}
+  .card.v2 .v2bar.good{background:var(--fill-g);color:var(--ink-g)}
+  .card.v2 .v2bar.bad{background:var(--fill-r);color:var(--ink-r)}
+  .card.v2 .v2bar .bv{font-family:'Archivo Expanded',sans-serif;font-weight:800;font-size:2.3vh;letter-spacing:.01em;white-space:nowrap}
+  .card.v2 .v2bar .bl{font-weight:800;font-size:1.45vh;white-space:nowrap}
+  .card.v2 .v2body{display:grid;grid-template-columns:minmax(13vh,0.95fr) 2fr;gap:.55vw;flex:1;min-height:0}
+  .card.v2 .avatar{width:100%;height:100%;min-height:13vh;flex:auto;border-radius:.9vh;object-fit:cover;object-position:50% 20%;font-size:4.2vh}
+  .card.v2 .v2tiles{display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:.35vh .3vw;min-height:0}
+  .card.v2 .v2tiles.c2{grid-template-columns:repeat(2,1fr)}
+  .tile.v2t{border-radius:.7vh;padding:.5vh .25vw;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.15vh;background:var(--fill-n);color:var(--ink);text-align:center;overflow:hidden}
+  .tile.v2t .t-val{font-weight:800;font-size:1.7vh;line-height:1.1;color:var(--ink)}
+  .tile.v2t .t-label{font-size:1.05vh;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-n);opacity:1;line-height:1.1}
+  .tile.v2t.good{background:var(--fill-g)}
+  .tile.v2t.good .t-label{color:var(--ink-g)}
+  .tile.v2t.bad{background:var(--fill-r)}
+  .tile.v2t.bad .t-label{color:var(--ink-r)}
+  .tile.v2t.na .t-val{color:var(--ink-n)}
+
+  .card.v2 .v2strip{border-radius:.7vh;background:var(--fill-n);padding:.5vh .3vw;text-align:center;margin-top:.35vh}
+  .card.v2 .v2strip .s-val{font-weight:800;font-size:1.7vh;color:var(--ink);line-height:1.1}
+  .card.v2 .v2strip .s-label{font-size:1.05vh;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-n);line-height:1.1}
+  .card.featured.v2 .v2strip .s-val{font-size:2.3vh}
+  .card.featured.v2 .v2strip .s-label{font-size:1.25vh}
+  .card.featured.v2{padding:1.8vh 1.1vw;gap:1vh}
+  .card.featured.v2 .v2name{font-size:3.3vh;white-space:normal;line-height:1.05}
+  .card.featured.v2 .v2role{font-size:1.75vh}
+  .card.featured.v2 .v2rank{font-size:3vh}
+  .card.featured.v2 .v2body{display:flex;flex-direction:column;gap:1vh;flex:1;min-height:0}
+  .card.featured.v2 .avatar{width:100%;height:33vh;min-height:0;border-radius:1.2vh;font-size:8vh}
+  .card.featured.v2 .v2bar .bv{font-size:3.3vh}
+  .card.featured.v2 .v2bar .bl{font-size:1.8vh}
+  .card.featured.v2 .v2tiles{flex:1}
+  .card.featured.v2 .tile.v2t .t-val{font-size:2.3vh}
+  .card.featured.v2 .tile.v2t .t-label{font-size:1.25vh}
+
+  footer{display:flex;align-items:center;justify-content:space-between;color:var(--ink-dim);font-size:1.8vh;font-weight:600;text-transform:uppercase;letter-spacing:.1em}
+  .legend{display:flex;gap:1.6vw;align-items:center}
+  .key{display:flex;align-items:center;gap:.4vw}
+  .swatch{width:1.7vh;height:1.7vh;border-radius:.5vh}
+  .swatch.g{background:var(--green)}
+  .swatch.r{background:var(--red)}
+  .dots{display:flex;gap:.8vw;align-items:center}
+  .dot{width:1.4vh;height:1.4vh;border-radius:50%;background:var(--line);transition:.3s}
+  .dot.active{background:var(--teal);transform:scale(1.35)}
+  #uploadHint{cursor:pointer}
+  #uploadHint:hover{color:var(--teal)}
+
+  .drop-overlay{
+    position:fixed;inset:0;background:rgba(18,166,131,.93);color:#fff;
+    display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2vh;
+    font-family:'Archivo Expanded',sans-serif;font-weight:800;font-size:4.5vh;text-transform:uppercase;
+    z-index:50;opacity:0;pointer-events:none;transition:opacity .2s;
+  }
+  .drop-overlay.on{opacity:1;pointer-events:all}
+  .drop-overlay small{font-family:'Archivo',sans-serif;font-weight:600;font-size:2.2vh;letter-spacing:.1em}
+  .toast{
+    position:fixed;bottom:3vh;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:1.4vh 2vw;border-radius:1.2vh;
+    font-weight:700;font-size:2.2vh;z-index:60;opacity:0;transition:opacity .3s;pointer-events:none;
+  }
+  .toast.on{opacity:1}
+  .empty{flex:1;display:flex;align-items:center;justify-content:center;font-size:3vh;color:var(--ink-dim);text-align:center;grid-column:1/-1}
+</style>
+</head>
+<body class="">
+<div class="stage">
+  <header>
+    <div>
+      <div class="title" id="boardTitle">Service</div>
+      <div class="subtitle">Omaha Drain &nbsp;·&nbsp; <b id="rangeLabel">Jul 1 – Jul 21, 2026</b> vs Monthly Goals</div>
+    </div>
+    <div class="meta">
+      <div class="clock" id="clock">7:49 PM</div>
+      <div id="unitLabel">Rotating All Divisions</div>
+    </div>
+  </header>
+
+  <div class="boards">
+    <div class="card featured" id="featured"></div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="fineprint" id="finePrint"><b>Total Revenue:</b> completed job revenue incl. adjustments — goal $40K/mo&nbsp;·&nbsp;<b>Sales:</b> total $ sold on your jobs — goal $100K/mo&nbsp;·&nbsp;<b>Close:</b> converted jobs ÷ opportunities (Total Conversion Rate) — goal 70%&nbsp;·&nbsp;<b>Avg Ticket:</b> revenue ÷ completed jobs — goal $400&nbsp;·&nbsp;<b>On Time:</b> arrivals within promised window — goal 80%</div>
+
+  <footer>
+    <div class="legend">
+      <div class="key"><div class="swatch g"></div>On Target</div>
+      <div class="key"><div class="swatch r"></div>Below Target</div>
+    </div>
+    <div class="dots" id="dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
+    <div id="uploadHint" title="Upload ServiceTitan export">Live Feed · Updated 7:37 PM</div>
+  </footer>
+</div>
+
+<div class="drop-overlay" id="dropOverlay">
+  Drop ServiceTitan Export
+  <small>Works with the scheduled "Technician Performance Board for TV" report or the Business Unit Manager ScoreCard export</small>
+</div>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileInput" accept=".xlsx" style="display:none">
+
+<script>
+/* ================================================================
+   CONFIG
+   ================================================================
+   URLS FOR THE THREE TVs:
+     yoursite.com?unit=service   yoursite.com?unit=sales
+     yoursite.com?unit=install   yoursite.com  (cycles all three)
+
+   DATA IN, two ways:
+     1. Drag any ServiceTitan export onto the page — the scheduled
+        "Technician Performance Board for TV" report OR the
+        Business Unit Manager ScoreCard export. Auto-detected.
+     2. Automated: paste the published Google Sheet xlsx link into
+        FEED_URL (fed by the Zapier + Apps Script pipeline).
+
+   TARGETS: the tech's revenue target comes from the ServiceTitan
+   "Daily Goal" column x days in the report range, when present.
+   Everything else uses the WEEKLY numbers below, auto-scaled to
+   the report's date range.
+   ================================================================ */
+
+const EXCLUDE = [
+  "Rod Chfat Field", "Jacksonator-Field Only", "Cody Hobbs"
+];
+
+/* Force a tech onto a specific board regardless of their home
+   Business Unit in ServiceTitan, e.g. "Tech Name": "sales" */
+/* Always show these techs even with zero activity in the report */
+const FORCE_SHOW = [
+  /* Service */
+  "Brandon Tibbott", "Steve Springer", "Dalton Jones", "Jamison Gruber",
+  "William Smith", "Nicholas Rivera", "Dylan Maet",
+  /* Install */
+  "Colton Bennett", "Manny Martinez", "Jackson Field",
+  "David Solokhin", "Danik Pidchenko", "Andrei Grachev"
+];
+
+/* ASSIGN: hard override — pins a tech to a board regardless of what
+   ServiceTitan says. Leave empty so ST's Business Unit stays the
+   source of truth; add a line only for a deliberate exception. */
+const ASSIGN = {
+};
+
+/* HOME_BOARD: used ONLY to place a force-shown tech who has no activity
+   yet this month. Once ST reports any work, their real Business Unit wins. */
+const HOME_BOARD = {
+  "Brandon Tibbott": "service",
+  "Steve Springer":  "service",
+  "Dalton Jones":    "service",
+  "Jamison Gruber":  "service",
+  "William Smith":   "service",
+  "Nicholas Rivera": "install",
+  "Dylan Maet":      "service",
+  "Colton Bennett":  "install",
+  "Manny Martinez":  "install",
+  "Jackson Field":   "install",
+  "David Solokhin":  "install",
+  "Danik Pidchenko": "install",
+  "Andrei Grachev":  "install"
+};
+
+const ROLES = {
+  "Brandon Tibbott": "Sewer Specialist",
+  "Bart Kephart":    "Service Manager",
+  "Colton Bennett":  "Install Lead",
+  "Manny Martinez":  "Install Lead",
+  "David Solokhin":  "Subcontractor",
+  "Jackson Field":   "Install Lead"
+};
+const ROLE_DEFAULT = { service:"Service Tech", servicesales:"Service Tech", sales:"Selling Tech", install:"Install Crew" };
+
+const PHOTOS = {
+  "Brandon Tibbott": "photos/brandon.jpg",
+  "Steve Springer":  "photos/steve.jpg",
+  "Dalton Jones":    "photos/dalton.jpg",
+  "Jamison Gruber":  "photos/jamison.jpg",
+  "William Smith":   "photos/william.jpg",
+  "Nicholas Rivera": "photos/nicholas.jpg",
+  "Manny Martinez":  "photos/manny.jpg",
+  "Colton Bennett":  "photos/colton.jpg",
+  "Danik Pidchenko": "photos/danik.jpg",
+  "Andrei Grachev":  "photos/andrei.jpg",
+  "Jackson Field":   "photos/jackson.jpg",
+  "Dylan Maet":      "photos/dylan.jpg",
+  "David Solokhin":  "photos/david.jpg"
+};
+
+const TARGETS = {
+  service: { revenue: 40000, sales: 100000, close: 70, avgTicket: 400, avgSale: 500, onTime: 80, leads: 20, zeroTicket: 6 },
+  // zeroTicket unused while tilesAlt is parked; kept so the Cube set can be switched back on.
+  // ALL dollar/count goals are MONTHLY; the feed shows month-to-date actuals against them.
+  sales:   { sales:   250000, close: 50, avgSale: 8000, opps: 40, onTime: 80 },
+  install: { revenue: 100000, eff: 80, onTime: 80, callbacks: 1, hoursPerJob: 8, jobs: 10, avgInstall: 5000 },
+  // callbacks/hoursPerJob/jobs/avgInstall unused while tilesAlt is parked.
+  techs: {
+    // per-tech weekly overrides, e.g.
+    // "Brandon Tibbott": { sales: 57700 }
+  }
+};
+TARGETS.servicesales = { sales: 150000, avgSale: 5000, close: 50, onTime: 80 };
+// Service · Sales slide: sold ≥ $150K/mo, avg sale ≥ $5K, close ≥ 50%, on-time ≥ 80%
+
+const CYCLE_SECONDS = 15;
+
+/* Fine print shown under each board — edit freely */
+const FINE_PRINT = {
+  service:      "<b>Total Revenue:</b> completed job revenue incl. adjustments — goal $40K/mo&nbsp;·&nbsp;<b>Sales:</b> total $ sold on your jobs — goal $100K/mo&nbsp;·&nbsp;<b>Close:</b> converted jobs ÷ opportunities (Total Conversion Rate) — goal 70%&nbsp;·&nbsp;<b>Avg Ticket:</b> revenue ÷ completed jobs — goal $400&nbsp;·&nbsp;<b>On Time:</b> arrivals within promised window — goal 80%",
+  servicesales: "<b>Total Sold:</b> total $ sold — goal $150K/mo &nbsp;·&nbsp; <b>Avg Sale:</b> sold $ ÷ closed estimates — goal $5,000 &nbsp;·&nbsp; <b>Close:</b> closed estimates ÷ opportunities (Close Rate) — goal 50% &nbsp;·&nbsp; <b>On Time:</b> arrivals within promised window — goal 80%",
+  install:      "<b>Install Revenue:</b> completed install revenue — goal $100K/mo&nbsp;·&nbsp;<b>Efficiency:</b> sold hours ÷ actual hours, capped at 100% (gray = no hours data) — goal 80%&nbsp;·&nbsp;<b>On Time:</b> arrivals within promised window — goal 80%",
+  sales:        "<b>Total Sold:</b> total $ sold — goal $250K/mo &nbsp;·&nbsp; <b>Close:</b> closed ÷ opportunities — goal 50% &nbsp;·&nbsp; <b>Avg Sale:</b> sold $ ÷ closed — goal $8,000 &nbsp;·&nbsp; <b>On Time:</b> goal 80%"
+};
+
+/* LIVE FEED (optional): publish the "OD Board Feed" Google Sheet
+   to the web as Entire Document → Microsoft Excel (.xlsx) and
+   paste the link here. Leave "" for drag-and-drop only. */
+const FEED_URL     = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTMSIWW2q5I7ALFzul4qXnWfEg9CkE1ZYyhgay4vXzjuG-cneNon7Urj7Z4P6BfHLX8Y2odJtxUizTS/pub?output=xlsx";
+const FEED_MINUTES = 15;
+/* ================================================================ */
+
+/* Preloaded fallback: scheduled report, Aug 3 – Aug 7, 2026 */
+const INITIAL_DATA = {"label":"Aug 3 – Aug 7, 2026","weeks":0.71,"days":5,"divisions":{"service":{"Steve Springer":{"revenue":13235.0,"jobs":11,"opps":10,"sales":29816.72,"closeRate":72.7,"estClose":62.5,"leads":8,"avgTicket":1203.18,"avgSale":2625.6,"onTime":86.7,"dailyGoal":2000.0,"eff":100,"sold":null,"zeroTicket":null,"hoursPerJob":null,"callbacks":null,"otWtd":null,"otMtd":null},"Jamison Gruber":{"revenue":11657.45,"jobs":11,"opps":11,"sales":32455.4,"closeRate":90.9,"estClose":72.7,"leads":7,"avgTicket":1059.77,"avgSale":4056.93,"onTime":75.0,"dailyGoal":2000.0,"eff":100,"sold":null,"zeroTicket":null,"hoursPerJob":null,"callbacks":null,"otWtd":null,"otMtd":null},"Brandon Tibbott":{"revenue":4777.0,"jobs":12,"opps":10,"sales":29627.13,"closeRate":83.3,"estClose":90.0,"leads":5,"avgTicket":398.08,"avgSale":3140.24,"onTime":83.3,"dailyGoal":2000.0,"eff":77.3,"sold":null,"zeroTicket":null,"hoursPerJob":null,"callbacks":null,"otWtd":null,"otMtd":null},"William Smith":{"revenue":1820.55,"jobs":12,"opps":11,"sales":3721.55,"closeRate":91.7,"estClose":80.0,"leads":9,"avgTicket":151.71,"avgSale":320.57,"onTime":84.2,"dailyGoal":2000.0,"eff":54.2,"sold":null,"zeroTicket":null,"hoursPerJob":null,"callbacks":null,"otWtd":null,"otMtd":null},"Dylan Maet":{"revenue":1971.0,"jobs":2,"opps":2,"sales":0.0,"closeRate":50.0,"estClose":0.0,"leads":2,"avgTicket":985.5,"avgSale":0.0,"onTime":72.7,"dailyGoal":0.0,"eff":28.6,"sold":null,"zeroTicket":null,"hoursPerJob":null,"callbacks":null,"otWtd":null,"otMtd":null},"Dalton Jones":{"revenue":0.0,"jobs":1,"opps":0,"sales":0.0,"closeRate":0.0,"estClose":0.0,"leads":0,"avgTicket":0.0,"avgSale":0.0,"onTime":0.0,"dailyGoal":2000.0,"eff":null,"sold":null,"zeroTicket":null,"hoursPerJob":null,"callbacks":null,"otWtd":null,"otMtd":null}},"sales":{"Cody Hobbs":{"revenue":0.0,"jobs":4,"opps":3,"sales":4375.0,"closeRate":75.0,"estClose":50.0,"leads":1,"avgTicket":0.0,"avgSale":4375.0,"onTime":100.0,"dailyGoal":2000.0,"eff":null,"sold":null,"zeroTicket":null,"hoursPerJob":null,"callbacks":null,"otWtd":null,"otMtd":null}},"install":{"Colton Bennett":{"revenue":38182.34,"jobs":2,"opps":2,"sales":0.0,"closeRate":100.0,"estClose":0.0,"leads":2,"avgTicket":19091.17,"avgSale":0.0,"onTime":0.0,"dailyGoal":2000.0,"eff":100,"sold":null,"zeroTicket":null,"hoursPerJob":null,"callbacks":null,"otWtd":null,"otMtd":null},"Manny Martinez":{"revenue":18860.0,"jobs":13,"opps":11,"sales":1897.0,"closeRate":46.2,"estClose":11.1,"leads":9,"avgTicket":1450.77,"avgSale":1289.0,"onTime":100.0,"dailyGoal":2000.0,"eff":100,"sold":null,"zeroTicket":null,"hoursPerJob":null,"callbacks":null,"otWtd":null,"otMtd":null},"Jackson Field":{"revenue":40104.16,"jobs":1,"opps":1,"sales":0.0,"closeRate":100.0,"estClose":0.0,"leads":0,"avgTicket":40104.16,"avgSale":0.0,"onTime":100.0,"dailyGoal":0.0,"eff":100,"sold":null,"zeroTicket":null,"hoursPerJob":null,"callbacks":null,"otWtd":null,"otMtd":null}}}};
+
+/* ---------------- state ---------------- */
+const params = new URLSearchParams(location.search);
+const lockedUnit = (params.get("unit") || "").toLowerCase();
+const UNITS = ["service","sales","install"];               // parser divisions (leave as-is)
+const ACTIVE_UNITS = ["service","servicesales","install"]; // boards shown on TVs — add "sales" back when the role is staffed
+const UNIT_TITLES = { service:"Service", servicesales:"Sales", sales:"Sales", install:"Install" };
+let unitIndex = Math.max(0, ACTIVE_UNITS.indexOf(lockedUnit));
+let data = INITIAL_DATA;
+
+const STORE_KEY = "odTvBoardData";
+try{
+  const saved = localStorage.getItem(STORE_KEY);
+  if(saved) data = JSON.parse(saved);
+}catch(e){}
+
+/* ---------------- helpers ---------------- */
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function initials(n){ return n.trim().split(/\s+/).map(w => w[0]).join("").slice(0,2).toUpperCase(); }
+function avatarFallback(img){
+  const d = document.createElement("div");
+  d.className = "avatar";
+  d.textContent = img.getAttribute("data-ini") || "?";
+  img.replaceWith(d);
+}
+function kFmt(n){
+  const neg = n < 0; n = Math.abs(n);
+  const s = n >= 10000 ? "$" + (n/1000).toFixed(1).replace(/\.0$/,"") + "K" : "$" + Math.round(n).toLocaleString("en-US");
+  return (neg ? "-" : "") + s;
+}
+function targetFor(t, div, key){
+  /* Goals are MONTHLY, shown flat: MTD actuals climb toward them. */
+  const o = TARGETS.techs[t.name];
+  if(o && o[key] != null) return o[key];
+  const base = TARGETS[div][key] || 0;
+  if(base > 0) return base;
+  if(key === "revenue" && t.dailyGoal > 0) return t.dailyGoal * 30; // ST Daily Goal fallback, monthly
+  return 0;
+}
+
+/* metric layout per division */
+const METRICS = {
+  service: {
+    rank: t => t.revenue,
+    big: { label:"Total Revenue", key:"revenue", fmt:kFmt, tkey:"revenue" },
+    tiles: t => ([
+      { label:"Sales",      val:kFmt(t.sales),          good: t.sales >= targetFor(t,"service","sales") },
+      { label:"Close",      val:Math.round(t.closeRate) + "%", good: t.closeRate >= targetFor(t,"service","close") },
+      { label:"Avg Ticket", val:kFmt(t.avgTicket),      good: t.avgTicket >= targetFor(t,"service","avgTicket") },
+      t.onTime != null
+        ? { label:"On Time", val:Math.round(t.onTime) + "%", good: t.onTime >= targetFor(t,"service","onTime") }
+        : { label:"Leads",   val:t.leads,               good: t.leads >= targetFor(t,"service","leads") }
+    ]),
+    /* PARKED — the 6-tile Cube-style set. Rename tilesAlt -> tiles to switch back. */
+    tilesAlt: t => ([
+      t.zeroTicket != null
+        ? { label:"Zero Ticket", val:t.zeroTicket, good: t.zeroTicket <= targetFor(t,"service","zeroTicket") }
+        : { label:"Zero Ticket", val:"\u2014", na:true },
+      { label:"Sales",      val:kFmt(t.sales),                good: t.sales     >= targetFor(t,"service","sales") },
+      { label:"Opps Conv",  val:Math.round(t.closeRate) + "%", good: t.closeRate >= targetFor(t,"service","close") },
+      { label:"Avg Ticket", val:kFmt(t.avgTicket),            good: t.avgTicket >= targetFor(t,"service","avgTicket") },
+      t.onTime != null
+        ? { label:"On Time", val:Math.round(t.onTime) + "%",  good: t.onTime    >= targetFor(t,"service","onTime") }
+        : { label:"On Time", val:"\u2014", na:true },
+      { label:"Jobs", val:t.jobs, na:true }
+    ])
+  },
+  servicesales: {
+    rank: t => t.sales,
+    big: { label:"Total Sold", key:"sales", fmt:kFmt, tkey:"sales" },
+    tiles: t => ([
+      { label:"Avg Sale", val:kFmt(t.avgSale),        good: t.avgSale >= targetFor(t,"servicesales","avgSale") },
+      { label:"Close",    val:Math.round(t.estClose != null ? t.estClose : t.closeRate) + "%", good: (t.estClose != null ? t.estClose : t.closeRate) >= targetFor(t,"servicesales","close") },
+      t.onTime != null
+        ? { label:"On Time", val:Math.round(t.onTime) + "%", good: t.onTime >= targetFor(t,"servicesales","onTime") }
+        : { label:"On Time", val:"—", na:true }
+    ])
+  },
+  sales: {
+    rank: t => t.sales,
+    big: { label:"Total Sold", key:"sales", fmt:kFmt, tkey:"sales" },
+    tiles: t => ([
+      { label:"Close",    val:Math.round(t.closeRate) + "%", good: t.closeRate >= targetFor(t,"sales","close") },
+      { label:"Avg Sale", val:kFmt(t.avgSale),        good: t.avgSale >= targetFor(t,"sales","avgSale") },
+      { label:"Opps",     val:t.opps,                 good: t.opps >= targetFor(t,"sales","opps") },
+      t.onTime != null
+        ? { label:"On Time", val:Math.round(t.onTime) + "%", good: t.onTime >= targetFor(t,"sales","onTime") }
+        : { label:"Sold",    val:(t.sold != null ? t.sold : "—"), good: t.sold > 0 }
+    ])
+  },
+  install: {
+    rank: t => t.revenue,
+    big: { label:"Install Revenue", key:"revenue", fmt:kFmt, tkey:"revenue" },
+    /* PARKED — the 6-tile Cube-style set. Rename tilesAlt -> tiles to switch back. */
+    tilesAlt: t => ([
+      t.hoursPerJob != null
+        ? { label:"Hours Per Job", val:t.hoursPerJob.toFixed(2), neutral:true }
+        : { label:"Hours Per Job", val:"\u2014", na:true },
+      { label:"Jobs Completed", val:t.jobs, neutral:true },
+      t.eff != null
+        ? { label:"Efficiency", val:Math.round(t.eff) + "%", good: t.eff >= targetFor(t,"install","eff") }
+        : { label:"Efficiency", val:"\u2014", na:true },
+      t.callbacks != null
+        ? { label:"Callbacks", val:t.callbacks, good: t.callbacks <= targetFor(t,"install","callbacks") }
+        : { label:"Callbacks", val:"\u2014", na:true },
+      t.onTime != null
+        ? { label:"On Time", val:Math.round(t.onTime) + "%", good: t.onTime >= targetFor(t,"install","onTime") }
+        : { label:"On Time", val:"\u2014", na:true },
+      { label:"Avg Install", val:kFmt(t.avgTicket), neutral:true }
+    ]),
+    /* PARKED — Overtime strip. Rename stripAlt -> strip to switch back. */
+    stripAlt: t => (t.otWtd != null || t.otMtd != null)
+      ? { label:"Overtime (WTD / MTD)",
+          val:(t.otWtd != null ? t.otWtd : "\u2014") + " / " + (t.otMtd != null ? t.otMtd : "\u2014") }
+      : null,
+    tiles: t => ([
+      t.eff != null
+        ? { label:"Efficiency", val:Math.round(t.eff) + "%", good: t.eff >= targetFor(t,"install","eff") }
+        : { label:"Efficiency", val:"—", na:true },
+      t.onTime != null
+        ? { label:"On Time", val:Math.round(t.onTime) + "%", good: t.onTime >= targetFor(t,"install","onTime") }
+        : { label:"On Time", val:"—", na:true }
+    ])
+  }
+};
+
+/* ---------------- render ---------------- */
+function assignedDivisions(){
+  /* apply ASSIGN overrides on top of home-BU placement */
+  const out = { service:{}, sales:{}, install:{} };
+  for(const div of UNITS){
+    for(const [name, t] of Object.entries(data.divisions[div] || {})){
+      const dest = ASSIGN[name] || div;
+      out[dest][name] = t;
+    }
+  }
+  for(const name of FORCE_SHOW){
+    const dest = ASSIGN[name] || HOME_BOARD[name] || "service";
+    const present = Object.values(out).some(d => d[name]);
+    if(!present) out[dest][name] = {revenue:0,jobs:0,opps:0,sales:0,closeRate:0,estClose:null,leads:0,avgTicket:0,avgSale:0,onTime:null,dailyGoal:0,eff:null,sold:null,zeroTicket:null,hoursPerJob:null,callbacks:null,otWtd:null,otMtd:null};
+  }
+  return out;
+}
+
+function cardHTML(t, rank, div){
+  const M = METRICS[div];
+  const bigVal = t[M.big.key];
+  const bigTgt = targetFor(t, div, M.big.tkey);
+  const bigGood = bigTgt > 0 ? bigVal >= bigTgt : bigVal > 0;
+  const role = ROLES[t.name] || ROLE_DEFAULT[div];
+  const avatar = PHOTOS[t.name]
+    ? '<img class="avatar" src="' + esc(PHOTOS[t.name]) + '" alt="" loading="eager" decoding="async" fetchpriority="high" data-ini="' + esc(initials(t.name)) + '" onerror="avatarFallback(this)">'
+    : '<div class="avatar">' + esc(initials(t.name)) + '</div>';
+  const tiles = M.tiles(t);
+  return (
+    '<div class="rankchip">#' + rank + '</div>' +
+    '<div class="head">' + avatar +
+      '<div class="who"><div class="name">' + esc(t.name) + '</div>' +
+      '<div class="role">' + esc(role) + '</div></div>' +
+    '</div>' +
+    '<div class="bigstat"><div class="label">' + M.big.label + '</div>' +
+      '<div class="val ' + (bigGood ? "good" : "bad") + '">' + M.big.fmt(bigVal) +
+      (bigTgt > 0 ? ' <span class="tgt">/ ' + M.big.fmt(bigTgt) + '</span>' : '') +
+      '</div></div>' +
+    '<div class="tiles' + (tiles.length === 3 ? ' t3' : '') + '">' +
+      tiles.map(x =>
+        '<div class="tile ' + (x.na ? "na" : x.good ? "good" : "bad") + '">' +
+        '<div class="t-label">' + x.label + '</div>' +
+        '<div class="t-val">' + x.val + '</div></div>'
+      ).join("") +
+    '</div>'
+  );
+}
+
+/* v2 card: green/red total bar on top, photo beside a 3x2 tile grid.
+   Used only by the Service board; install & sales keep the original card. */
+function cardHTMLV2(t, rank, div, isFeat){
+  const M = METRICS[div];
+  const bigVal  = t[M.big.key];
+  const bigTgt  = targetFor(t, div, M.big.tkey);
+  const bigGood = bigTgt > 0 ? bigVal >= bigTgt : bigVal > 0;
+  const role = ROLES[t.name] || ROLE_DEFAULT[div];
+  const avatar = PHOTOS[t.name]
+    ? '<img class="avatar" src="' + esc(PHOTOS[t.name]) + '" alt="" loading="eager" decoding="async" fetchpriority="high" data-ini="' + esc(initials(t.name)) + '" onerror="avatarFallback(this)">'
+    : '<div class="avatar">' + esc(initials(t.name)) + '</div>';
+  const tiles = M.tiles(t);
+
+  const head =
+    '<div class="v2head"><div class="v2who">' +
+      '<div class="v2name">' + esc(t.name) + '</div>' +
+      '<div class="v2role">' + esc(role) + '</div>' +
+    '</div><div class="v2rank">#' + rank + '</div></div>';
+
+  const bar =
+    '<div class="v2bar ' + (bigGood ? "good" : "bad") + '">' +
+      '<span class="bv">' + M.big.fmt(bigVal) + '</span>' +
+      '<span class="bl">' + M.big.label + '</span>' +
+    '</div>';
+
+  /* 3 or 6 tiles -> 3 across; 2 or 4 tiles -> 2 across, so no orphan row */
+  const tileGrid =
+    '<div class="v2tiles' + (tiles.length === 2 || tiles.length === 4 ? " c2" : "") + '">' +
+      tiles.map(x =>
+        '<div class="tile v2t ' + (x.na ? "na" : x.neutral ? "" : x.good ? "good" : "bad") + '">' +
+        '<div class="t-val">' + x.val + '</div>' +
+        '<div class="t-label">' + x.label + '</div></div>'
+      ).join("") +
+    '</div>';
+
+  const st = M.strip ? M.strip(t) : null;
+  const strip = st
+    ? '<div class="v2strip"><div class="s-val">' + st.val + '</div>' +
+      '<div class="s-label">' + st.label + '</div></div>'
+    : '';
+
+  return isFeat
+    ? head + '<div class="v2body">' + avatar + bar + tileGrid + strip + '</div>'
+    : head + bar + '<div class="v2body">' + avatar + tileGrid + '</div>' + strip;
+}
+
+function render(){
+  const div = ACTIVE_UNITS[unitIndex];
+  const M = METRICS[div];
+  $("boardTitle").textContent = UNIT_TITLES[div];
+  $("rangeLabel").textContent = data.label || "—";
+  $("unitLabel").textContent = lockedUnit ? "" : "Rotating All Divisions";
+  $("finePrint").innerHTML = FINE_PRINT[div] || "";
+
+  $("dots").innerHTML = (lockedUnit || ACTIVE_UNITS.length < 2) ? "" :
+    ACTIVE_UNITS.map((u,i) => '<div class="dot' + (i === unitIndex ? " active" : "") + '"></div>').join("");
+
+  const pool = div === "servicesales" ? "service" : div;
+  const techs = Object.entries(assignedDivisions()[pool])
+    .filter(([name]) => !EXCLUDE.includes(name))
+    .map(([name,d]) => ({name, ...d}))
+    .sort((a,b) => M.rank(b) - M.rank(a));
+
+  const feat = $("featured"), grid = $("grid");
+  if(!techs.length){
+    feat.innerHTML = "";
+    grid.innerHTML = '<div class="empty">No data for this division in the current report.</div>';
+    return;
+  }
+  const V2 = true;   // v2 card design on every board
+  feat.className = "card featured" + (V2 ? " v2" : "");
+  feat.innerHTML = V2 ? cardHTMLV2(techs[0], 1, div, true) : cardHTML(techs[0], 1, div);
+  grid.innerHTML = "";
+  techs.slice(1).forEach((t,i) => {
+    const c = document.createElement("div");
+    c.className = "card" + (V2 ? " v2" : "");
+    c.innerHTML = V2 ? cardHTMLV2(t, i + 2, div, false) : cardHTML(t, i + 2, div);
+    grid.appendChild(c);
+  });
+  const n = techs.length - 1;
+  grid.style.gridTemplateColumns = V2
+    ? (n > 9 ? "repeat(4,1fr)" : "repeat(3,1fr)")
+    : (n > 8 ? "repeat(5,1fr)" : n > 6 ? "repeat(4,1fr)" : "repeat(3,1fr)");
+}
+
+/* ---------------- parsers ---------------- */
+function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+function truthy(v){ return v === true || v === "True" || v === "TRUE" || v === 1; }
+
+function parseDateRange(wb){
+  let label = "Custom Range", weeks = 1, days = 7;
+  const fs = wb.Sheets["Filters"];
+  if(fs){
+    const cells = XLSX.utils.sheet_to_json(fs, {header:1, defval:""});
+    for(const row of cells){
+      const i = row.findIndex(c => String(c).trim() === "Date Range");
+      if(i >= 0 && row[i+1]){
+        const m = String(row[i+1]).match(/(\d{2})\/(\d{2})\/(\d{2})\s*-\s*(\d{2})\/(\d{2})\/(\d{2})/);
+        if(m){
+          const s = new Date(2000 + +m[3], +m[1]-1, +m[2]);
+          const e = new Date(2000 + +m[6], +m[4]-1, +m[5]);
+          days = Math.max(1, Math.round((e - s)/86400000) + 1);
+          weeks = Math.max(1, Math.round(days/7 * 100)/100);
+          const opt = {month:"short", day:"numeric"};
+          label = s.toLocaleDateString("en-US",opt) + " – " + e.toLocaleDateString("en-US",opt) + ", " + e.getFullYear();
+        }
+      }
+    }
+  }
+  return { label, weeks, days };
+}
+
+/* Format A: scheduled "Technician Performance Board for TV" report */
+function parseScheduledReport(wb, sheetName){
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {defval:null});
+  const divisions = { service:{}, sales:{}, install:{} };
+  for(const r of rows){
+    const name = String(r["Name"] || "").trim();
+    const bu = String(r["Technician Business Unit"] || "");
+    if(!name || !bu || bu === "null" || /^\d+$/.test(name)) continue; // skip totals row
+    const div = /Sales/i.test(bu) ? "sales" : /Install/i.test(bu) ? "install" : "service";
+    const t = {
+      revenue:   num(r["Completed Revenue with Adjustments"]),
+      jobs:      num(r["Completed Jobs"]),
+      opps:      num(r["Opportunity"]),
+      sales:     num(r["Total Sales"]),
+      closeRate: num(r["Total Conversion Rate"]) * 100,
+      estClose:  r["Close Rate"] != null ? num(r["Close Rate"]) * 100 : null,
+      leads:     r["Lead Gen Opportunity"] != null ? num(r["Lead Gen Opportunity"]) : num(r["Leads Set"]),
+      avgTicket: num(r["Total Job Average"]),
+      avgSale:   num(r["Closed Average Sale"]),
+      onTime:    num(r["Appts On Time Percentage"]) * 100,
+      dailyGoal: num(r["Daily Goal"]),
+      /* Zero Ticket = completed jobs that billed $0. Add any ONE of these
+         column names to the ServiceTitan report and the tile lights up. */
+      zeroTicket: r["Zero Ticket"]       != null ? num(r["Zero Ticket"])
+                : r["Zero Ticket Jobs"]  != null ? num(r["Zero Ticket Jobs"])
+                : r["Zero Revenue Jobs"] != null ? num(r["Zero Revenue Jobs"])
+                : r["No Charge Jobs"]    != null ? num(r["No Charge Jobs"]) : null,
+      /* Install tiles. Add any ONE of each set of column names to the
+         ServiceTitan report and the matching tile lights up automatically. */
+      hoursPerJob: r["Hours Per Job"] != null ? num(r["Hours Per Job"])
+                 : (r["Job Hours"] != null && num(r["Completed Jobs"]) > 0) ? num(r["Job Hours"]) / num(r["Completed Jobs"])
+                 : (r["Total Hours"] != null && num(r["Completed Jobs"]) > 0) ? num(r["Total Hours"]) / num(r["Completed Jobs"])
+                 : null,
+      callbacks: r["Callbacks"] != null ? num(r["Callbacks"])
+               : r["Callback"]  != null ? num(r["Callback"])
+               : r["Recalls"]   != null ? num(r["Recalls"])
+               : r["Recall"]    != null ? num(r["Recall"]) : null,
+      otWtd: r["Overtime WTD"] != null ? num(r["Overtime WTD"]) : null,
+      otMtd: r["Overtime MTD"] != null ? num(r["Overtime MTD"])
+           : r["Overtime"]     != null ? num(r["Overtime"]) : null,
+      eff:       (r["Billable Efficiency"] != null && num(r["Billable Efficiency"]) > 0)
+                   ? Math.min(num(r["Billable Efficiency"]) * 100, 100)   // 0 = no data; capped at 100%
+                   : null,
+      sold: null
+    };
+    if(Math.abs(t.revenue) > 0 || t.sales > 0 || t.opps > 0 || t.jobs > 0) divisions[div][name] = t;
+  }
+  return divisions;
+}
+
+/* Format B: Business Unit Manager ScoreCard multi-tab export */
+function parseScoreCard(wb){
+  const divisions = {};
+  const DIVS = { service:"Service", sales:"Sales", install:"Install" };
+  for(const [key, prefix] of Object.entries(DIVS)){
+    const raw = {};
+    const T = n => {
+      n = String(n || "").trim();
+      if(!n) return null;
+      return raw[n] || (raw[n] = {revenue:0,jobs:0,sales:0,opps:0,closed:0,leads:0,soldH:0,jobH:0});
+    };
+    const rows = name => {
+      const ws = wb.Sheets[prefix + " - " + name];
+      return ws ? XLSX.utils.sheet_to_json(ws, {defval:null}) : [];
+    };
+    rows("Completed Jobs").forEach(r => { const t = T(r["Technician Name"]); if(t){ t.revenue += num(r["Revenue"]); t.jobs += 1; } });
+    rows("Total Sales").forEach(r => { const t = T(r["Technician Name"]); if(t && truthy(r["Closed"])) t.sales += num(r["Estimate Subtotal"]); });
+    rows("Close Rate").forEach(r => { const t = T(r["Technician Name"]); if(!t) return;
+      if(truthy(r["Sales Opportunity"])) t.opps += 1; if(truthy(r["Closed"])) t.closed += 1; });
+    rows("Lead Gen. Opportunity").forEach(r => { const t = T(r["Technician Name"]); if(t) t.leads += 1; });
+    rows("Billable Efficiency").forEach(r => { const t = T(r["Technician Name"]); if(t){ t.soldH += num(r["Sold Hours"]); t.jobH += num(r["Job Hours"]); } });
+    const out = {};
+    for(const [name, d] of Object.entries(raw)){
+      if(!(Math.abs(d.revenue) > 0 || d.sales > 0 || d.opps > 0 || d.leads > 0)) continue;
+      out[name] = {
+        revenue: d.revenue, jobs: d.jobs, opps: d.opps, sales: d.sales,
+        closeRate: d.opps ? d.closed/d.opps*100 : 0,
+        estClose:  d.opps ? d.closed/d.opps*100 : 0,
+        leads: d.leads,
+        avgTicket: d.jobs ? d.revenue/d.jobs : 0,
+        avgSale: d.closed ? d.sales/d.closed : 0,
+        onTime: null, dailyGoal: 0, zeroTicket: null,
+        hoursPerJob: (d.jobH > 0 && d.jobs > 0) ? d.jobH / d.jobs : null,
+        callbacks: null, otWtd: null, otMtd: null,
+        eff: (d.jobH > 0 && d.soldH > 0) ? Math.min(d.soldH/d.jobH*100, 100) : null,
+        sold: d.closed
+      };
+    }
+    divisions[key] = out;
+  }
+  return divisions;
+}
+
+function parseWorkbook(wb){
+  const range = parseDateRange(wb);
+  /* detect format: any sheet with a "Technician Business Unit" header = scheduled report */
+  for(const name of wb.SheetNames){
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, defval:""});
+    if(rows.length && rows[0].some(h => String(h).trim() === "Technician Business Unit")){
+      return { ...range, divisions: parseScheduledReport(wb, name) };
+    }
+  }
+  return { ...range, divisions: parseScoreCard(wb) };
+}
+
+/* ---------------- data intake ---------------- */
+function applyData(d, source){
+  data = d;
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(data)); }catch(err){}
+  render();
+  if(source) toast("Board updated — " + data.label);
+}
+
+function handleFile(file){
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:"array"});
+      applyData(parseWorkbook(wb), "upload");
+    }catch(err){
+      toast("Couldn't read that file — use a ServiceTitan .xlsx export");
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function fetchFeed(){
+  if(!FEED_URL) return;
+  try{
+    const url = FEED_URL + (FEED_URL.includes("?") ? "&" : "?") + "cb=" + Date.now();
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(res.status);
+    const buf = await res.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(buf), {type:"array"});
+    applyData(parseWorkbook(wb), null);
+    $("uploadHint").textContent = "Live Feed · Updated " +
+      new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});
+  }catch(err){
+    $("uploadHint").textContent = "Feed Unreachable — Drop Export to Update";
+  }
+}
+if(FEED_URL){ fetchFeed(); setInterval(fetchFeed, FEED_MINUTES * 60 * 1000); }
+
+let toastTimer;
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("on"), 4000);
+}
+
+/* drag & drop + picker */
+let dragDepth = 0;
+window.addEventListener("dragenter", e => { e.preventDefault(); dragDepth++; $("dropOverlay").classList.add("on"); });
+window.addEventListener("dragleave", e => { e.preventDefault(); if(--dragDepth <= 0){ dragDepth = 0; $("dropOverlay").classList.remove("on"); } });
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => {
+  e.preventDefault(); dragDepth = 0; $("dropOverlay").classList.remove("on");
+  if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+$("uploadHint").addEventListener("click", () => $("fileInput").click());
+$("fileInput").addEventListener("change", e => { if(e.target.files.length) handleFile(e.target.files[0]); });
+
+/* other tabs update when one tab gets new data */
+window.addEventListener("storage", e => {
+  if(e.key === STORE_KEY && e.newValue){
+    try{ data = JSON.parse(e.newValue); render(); }catch(err){}
+  }
+});
+
+/* idle cursor hide */
+let idleTimer;
+function wake(){
+  document.body.classList.remove("idle");
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => document.body.classList.add("idle"), 4000);
+}
+window.addEventListener("mousemove", wake);
+wake();
+
+/* clock + rotation */
+function tick(){ $("clock").textContent = new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}); }
+tick(); setInterval(tick, 15000);
+if(!lockedUnit && ACTIVE_UNITS.length > 1) setInterval(() => { unitIndex = (unitIndex + 1) % ACTIVE_UNITS.length; render(); }, CYCLE_SECONDS * 1000);
+render();
+</script>
+
+
+</body></html>
