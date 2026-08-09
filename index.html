@@ -295,8 +295,7 @@ function renderTiles(d){
       <div class="lab">${m.label}</div>
       <div class="big">${money(m.amount)}</div>
       <div class="meta">${m.customers} accounts</div>
-      <div class="note">${escapeHTML(m.note)}</div>
-      <span class="owner">Owner: ${escapeHTML(m.owner)}</span></div>`);
+      <div class="note">${escapeHTML(m.note)}</div></div>`);
   }
 
   document.getElementById('tiles').innerHTML = t.join('');
