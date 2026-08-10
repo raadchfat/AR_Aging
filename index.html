@@ -197,11 +197,11 @@ function renderGauges(d){
     }
     return `<div class="card gauge">
       <h2>${g.label}</h2>
-      ${gaugeSVG(g, d.bands)}
+      ${gaugeSVG(g, g.bands || d.bands)}
       <div class="amt">${money(g.amount)} past this mark</div>
       ${delta}
       <span class="pill"><span class="dot" style="background:${colorFor(g.band)}"></span>${g.bandLabel}</span>
-      <div class="target">Target ${d.bands.goodMax}% or under · ${d.bands.warnMax}%+ is critical</div>
+      <div class="target">Target ${(g.bands||d.bands).goodMax}% or under · ${(g.bands||d.bands).warnMax}%+ is critical</div>
     </div>`;
   }).join('');
 }
