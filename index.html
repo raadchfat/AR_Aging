@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
 <title>AR Board — Omaha Drain</title>
+<link rel="icon" href="https://cdn.prod.website-files.com/689e50eba40afe3da9c26455/6936fd45b2dbb841742c630f_b1b16ae6b9097b62674e58d9e373a5d0_Omaha%20logo.avif">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Expanded:wght@600;700;800&display=swap" rel="stylesheet">
@@ -37,7 +38,11 @@
     padding:20px 22px 0;
     display:flex;flex-direction:column;gap:14px;min-height:100%;
   }
-  .row{display:flex;align-items:baseline;gap:14px}
+  .row{display:flex;align-items:center;gap:14px}
+  /* Hides itself via onerror if logo.png is not in the repo, so a
+     missing file never shows a broken-image icon on the wall. */
+  #logo{height:52px;width:52px;flex:none;display:block}
+  .row h1,.row .sub{align-self:baseline}
   h1{font-family:'Archivo Expanded','Archivo',sans-serif;font-weight:800;font-size:30px;letter-spacing:-.01em}
   .sub{font-weight:600;font-size:13px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em}
   .spacer{margin-left:auto}
@@ -99,6 +104,12 @@
 <body>
 
 <div class="row">
+  <!-- Hosted on the Webflow CDN. If it ever fails to load the element
+       hides itself rather than showing a broken-image icon. To swap the
+       logo, change this one URL. -->
+  <img id="logo" alt="Omaha Drain"
+       src="https://cdn.prod.website-files.com/689e50eba40afe3da9c26455/6936fd45b2dbb841742c630f_b1b16ae6b9097b62674e58d9e373a5d0_Omaha%20logo.avif"
+       onerror="this.style.display='none'">
   <h1 id="title">ACCOUNTS RECEIVABLE</h1>
   <span class="sub" id="subtitle"></span>
   <div class="spacer"></div>
