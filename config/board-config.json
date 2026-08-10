@@ -23,11 +23,11 @@
     "refreshMinutes": 15,
     "compareDaysAgo": 7,
 
-    "_worklistNote": "The worklist ranks by PAST DUE money, not by total owed. Sorting by total owed puts customers at the top who were invoiced two weeks ago and owe nothing late — a collections person would spend the morning calling people who are not late. 'basis' is which columns count as past due; the default is everything 31 days and older, matching the first gauge.",
+    "_worklistNote": "The worklist ranks by PAST DUE money, not by total owed. Sorting by total owed puts customers at the top who were invoiced two weeks ago and owe nothing late — a collections person would spend the morning calling people who are not late. 'basis' is which columns count as past due; the default is everything 31 days and older, matching the first gauge. minPastDue is a call-list floor only: it decides who is worth a phone call, and it deliberately does NOT affect the gauges, which measure all receivables.",
     "worklist": {
       "basis": ["Aging60", "Aging90", "Aging120", "AgingPast120"],
       "columnLabel": "Past Due",
-      "minPastDue": 100,
+      "minPastDue": 1000,
       "size": 20
     },
 
@@ -45,26 +45,29 @@
       "tolerance": 0.02
     },
 
-    "_gaugeNote": "Cumulative, not per-bucket: 'over 60' includes everything 61 days and older. Lower is better on all three, which is what makes one set of thresholds valid across all of them. Membership dues are excluded from both the top and bottom of every ratio.",
+    "_gaugeNote": "Cumulative, not per-bucket: 'over 60' includes everything 61 days and older. Each gauge carries its own thresholds, because the same percentage means different things at different ages — 25% of receivables sitting past 30 days is normal trade credit, while 25% sitting past 90 days is money you may never see. Membership dues are excluded from both the top and bottom of every ratio.",
     "gauges": [
       {
         "key": "over30",
         "label": "Over 30 Days",
-        "fields": ["Aging60", "Aging90", "Aging120", "AgingPast120"]
+        "fields": ["Aging60", "Aging90", "Aging120", "AgingPast120"],
+        "bands": { "goodMax": 30, "warnMax": 60 }
       },
       {
         "key": "over60",
         "label": "Over 60 Days",
-        "fields": ["Aging90", "Aging120", "AgingPast120"]
+        "fields": ["Aging90", "Aging120", "AgingPast120"],
+        "bands": { "goodMax": 20, "warnMax": 40 }
       },
       {
         "key": "over90",
         "label": "Over 90 Days",
-        "fields": ["Aging120", "AgingPast120"]
+        "fields": ["Aging120", "AgingPast120"],
+        "bands": { "goodMax": 10, "warnMax": 20 }
       }
     ],
 
-    "_bandsNote": "Percent of receivables past that mark. At or below goodMax is green, up to warnMax is orange, at or above warnMax is red.",
+    "_bandsNote": "Fallback only — used if a gauge above has no bands of its own. At or below goodMax is green, up to warnMax is orange, at or above warnMax is red.",
     "bands": { "goodMax": 20, "warnMax": 50 },
     "bandLabels": { "good": "ON TRACK", "warn": "WATCH", "bad": "CRITICAL" },
 
