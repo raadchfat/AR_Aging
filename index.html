@@ -11,13 +11,19 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Expanded:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --surface:#f4f5f3;
+    /* Omaha Drain palette, sampled from the logo: deep navy and the cyan
+       wave. Navy replaces black for every ink level, so the whole board
+       reads as the brand rather than as a generic dashboard. */
+    --navy:#0B2A45;
+    --cyan:#29ABC8;
+
+    --surface:#EEF3F6;
     --card:#ffffff;
-    --ink:#0b0b0b;
-    --ink-2:#52514e;
-    --ink-3:#8b8a86;
-    --line:#e4e5e1;
-    --track:#d8dade;
+    --ink:#0B2A45;
+    --ink-2:#40607C;
+    --ink-3:#8AA0B4;
+    --line:#DDE6EC;
+    --track:#C7D5E0;
 
     /* Status palette. Reserved for state, never reused as decoration.
        Orange vs green are not separable for red-green colour blindness,
@@ -54,7 +60,9 @@
   .gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
   .gauge{display:flex;flex-direction:column;align-items:center;gap:2px;padding-bottom:12px}
   .gauge h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-2);margin-bottom:6px}
-  .gauge svg{width:100%;max-width:280px;height:auto;display:block}
+  .gauge svg{width:100%;max-width:300px;height:auto;display:block;margin-bottom:2px}
+  .gauge .pct{font-family:'Archivo Expanded','Archivo',sans-serif;font-size:34px;font-weight:800;
+              letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1}
   .gauge .amt{font-size:14px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}
   .gauge .target{font-size:11px;color:var(--ink-3);margin-top:7px;letter-spacing:.02em}
   .gauge .delta{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums;margin-top:2px}
@@ -74,14 +82,14 @@
   td{padding:7px 8px;border-top:1px solid var(--line);font-size:15px}
   tr.done td{color:var(--ink-3)}
   tr.done td.nm{text-decoration:line-through}
-  td.rk{color:var(--ink-3);font-size:13px;width:26px}
+  td.rk{color:var(--cyan);font-size:13px;font-weight:700;width:26px}
   td.nm{font-weight:600;max-width:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   td.ow{font-weight:700}
   td.tot{color:var(--ink-3);font-size:13px}
   td.tot .same{color:#c3c2be}
   td.bk{color:var(--ink-2);font-size:13px;white-space:nowrap}
   td.ck{width:34px;text-align:center}
-  input[type=checkbox]{width:17px;height:17px;cursor:pointer;accent-color:var(--good)}
+  input[type=checkbox]{width:17px;height:17px;cursor:pointer;accent-color:var(--cyan)}
   .overflow{margin-top:10px;font-size:12px;color:var(--ink-3);border-top:1px solid var(--line);padding-top:9px}
 
   .tiles{display:flex;flex-direction:column;gap:14px}
@@ -93,10 +101,10 @@
   .good-news{color:var(--good);font-weight:700}
 
   footer{border-top:1px solid var(--line);padding:12px 2px 16px;display:flex;gap:26px;flex-wrap:wrap;align-items:baseline}
-  footer .lab{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-3)}
+  footer .lab{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--cyan)}
   footer ul{list-style:none;display:flex;gap:22px;flex-wrap:wrap}
   footer li{font-size:13px;color:var(--ink-2);position:relative;padding-left:14px}
-  footer li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--track)}
+  footer li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%;background:var(--cyan)}
 
   #err{display:none;background:#fdecea;border:1px solid #f3c6c1;color:#8a2018;border-radius:10px;padding:9px 14px;font-size:13px}
 </style>
@@ -158,43 +166,55 @@ const moneyExact = n => '$' + n.toLocaleString('en-US',{minimumFractionDigits:2,
 const colorFor = b => b === 'good' ? 'var(--good)' : b === 'warn' ? 'var(--warn)' : 'var(--bad)';
 
 /* ---------- gauge ----------------------------------------------------
-   240-degree arc: 0% at lower-left, 50% at top, 100% at lower-right.
+   240-degree dial: 0 at lower-left, 50 at top, 100 at lower-right.
    Angle is measured from 12 o'clock, clockwise, which is why x uses sin
-   and y uses -cos. Getting this backwards puts the fill in the wrong
-   quadrant, which is exactly what happened the first time. */
-const SWEEP = 240, HALF = SWEEP/2, SEGS = 40;
+   and y uses -cos.
+
+   41 ticks at 2.5-unit steps. Every second tick lands on a multiple of
+   five, runs longer, and carries a number — so the dial is readable as a
+   scale, not just as a proportion of filled colour. The needle points at
+   the current value and the percentage is printed underneath. */
+const SWEEP = 240, HALF = SWEEP/2, TICKS = 41;
 const pt = (cx,cy,r,deg) => {
   const a = deg * Math.PI/180;
   return [cx + r*Math.sin(a), cy - r*Math.cos(a)];
 };
 
-function gaugeSVG(g, bands){
-  const W=280,H=178,cx=140,cy=120,rOut=95,rIn=74;
-  const angleAt = f => -HALF + SWEEP*f;
-  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${g.label}: ${g.percent} percent of receivables, ${g.bandLabel}">`;
+function gaugeSVG(g){
+  const W=300, H=226, cx=150, cy=148;
+  const rOut=110, rInMajor=86, rInMinor=94, rLabel=127;
+  const angleAt = v => -HALF + SWEEP*(v/100);
+  const fill = colorFor(g.band);
 
-  for(let i=0;i<SEGS;i++){
-    const f = i/(SEGS-1);
-    const on = f*100 <= g.percent + 0.001;
-    const [x1,y1] = pt(cx,cy,rIn,angleAt(f)), [x2,y2] = pt(cx,cy,rOut,angleAt(f));
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="${g.label}: ${g.percent} percent of receivables, ${g.bandLabel}">`;
+
+  for(let i=0;i<TICKS;i++){
+    const v = i*(100/(TICKS-1));
+    const major = i % 2 === 0;
+    const deg = angleAt(v);
+    const on = v <= g.percent + 0.001;
+    const [x1,y1] = pt(cx,cy, major?rInMajor:rInMinor, deg);
+    const [x2,y2] = pt(cx,cy, rOut, deg);
     s += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
-          stroke="${on?colorFor(g.band):'var(--track)'}" stroke-width="6.5" stroke-linecap="round"/>`;
+          stroke="${on?fill:'var(--track)'}" stroke-width="${major?7:5}" stroke-linecap="round"/>`;
+    if(major){
+      const [lx,ly] = pt(cx,cy,rLabel,deg);
+      s += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="9.5" font-weight="700"
+            fill="var(--ink-3)" text-anchor="middle" dominant-baseline="central">${Math.round(v)}</text>`;
+    }
   }
 
-  // Threshold marks only — no numbers on the arc. Labelling them here
-  // collided with the 50% mark at the top; the target is printed as text
-  // under the dial instead, where it can't overlap anything.
-  for(const t of [bands.goodMax, bands.warnMax]){
-    const d = angleAt(t/100);
-    const [x1,y1] = pt(cx,cy,rOut+4,d), [x2,y2] = pt(cx,cy,rOut+11,d);
-    s += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
-          stroke="#a9a8a3" stroke-width="2" stroke-linecap="round"/>`;
-  }
+  // Needle. Drawn pointing straight up from the hub, then rotated to the
+  // value — far easier to keep correct than building the shape at an angle.
+  const deg = angleAt(Math.max(0, Math.min(100, g.percent)));
+  s += `<g transform="rotate(${deg.toFixed(2)} ${cx} ${cy})">
+      <path d="M ${cx-9} ${cy} Q ${cx-7} ${cy-38} ${cx} ${cy-56}
+               Q ${cx+7} ${cy-38} ${cx+9} ${cy}
+               A 9 9 0 0 1 ${cx-9} ${cy} Z" fill="var(--navy)"/>
+    </g>`;
+  s += `<circle cx="${cx}" cy="${cy}" r="3.4" fill="#fff"/>`;
 
-  s += `<text x="${cx}" y="${cy+8}" font-family="Archivo Expanded, Archivo, sans-serif" font-size="42" font-weight="800"
-        fill="var(--ink)" text-anchor="middle" style="font-variant-numeric:tabular-nums">${g.percent.toFixed(1)}%</text>`;
-  s += `<text x="${cx}" y="${cy+28}" font-size="11" font-weight="600" fill="#8b8a86" text-anchor="middle"
-        letter-spacing="1.3">OF RECEIVABLES</text>`;
   return s + '</svg>';
 }
 
@@ -208,7 +228,8 @@ function renderGauges(d){
     }
     return `<div class="card gauge">
       <h2>${g.label}</h2>
-      ${gaugeSVG(g, g.bands || d.bands)}
+      ${gaugeSVG(g)}
+      <div class="pct">${g.percent.toFixed(1)}%</div>
       <div class="amt">${money(g.amount)} past this mark</div>
       ${delta}
       <span class="pill"><span class="dot" style="background:${colorFor(g.band)}"></span>${g.bandLabel}</span>
