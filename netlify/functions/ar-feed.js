@@ -160,7 +160,11 @@ function build(cur, prior, today, priorDate, priorError, debug) {
       priorPct = round1((sumFields(prior.real, g.fields) / priorBase) * 100);
     }
 
-    const band = pct <= bands.goodMax ? 'good' : pct < bands.warnMax ? 'warn' : 'bad';
+    // Each gauge carries its own thresholds. The same percentage is not the
+    // same news at different ages: a third of receivables past 30 days is
+    // ordinary trade credit, a third past 90 days is money at real risk.
+    const gb = g.bands || bands;
+    const band = pct <= gb.goodMax ? 'good' : pct < gb.warnMax ? 'warn' : 'bad';
 
     return {
       key: g.key,
@@ -168,6 +172,7 @@ function build(cur, prior, today, priorDate, priorError, debug) {
       percent: pct,
       amount,
       band,
+      bands: gb,
       // Status colour never travels alone — the board prints this word and the
       // number beside every dial, so the reading survives colour blindness,
       // a washed-out screen, and a photo of the screen.
