@@ -112,6 +112,7 @@ async function snapshot(asOfDate) {
 
   const real = [];
   const membership = [];
+  let skippedZeroOrCredit = 0;
 
   for (const row of rows) {
     const cols = {};
@@ -121,7 +122,13 @@ async function snapshot(asOfDate) {
       cols[f] = v;
       owed += v;
     }
-    if (owed <= 0) continue;
+    // Zero-balance and credit-balance customers are dropped outright. They
+    // are not collections targets, and counting them would inflate both the
+    // customer counts and the denominator under every gauge.
+    if (owed <= 0.005) {
+      skippedZeroOrCredit++;
+      continue;
+    }
 
     const entry = { name: String(row.CustomerName || '').trim(), owed: round2(owed), cols };
 
@@ -129,18 +136,37 @@ async function snapshot(asOfDate) {
     else real.push(entry);
   }
 
-  return { asOfDate, rows: rows.length, real, membership, pagesFetched, hitPageLimit };
+  return { asOfDate, rows: rows.length, real, membership, skippedZeroOrCredit, pagesFetched, hitPageLimit };
+}
+
+/**
+ * How much of one customer's money sits in a group of aging columns.
+ *
+ * Two rules, both there to stop the board overstating what someone owes:
+ *
+ *  - Credits inside the group net against debits, rather than being floored
+ *    at zero one column at a time.
+ *  - The result can never exceed what the customer owes in total. A customer
+ *    with $1,200 in 121+ and a $300 credit sitting in Current owes $900, and
+ *    the board must not put $1,200 next to their name.
+ *
+ * A customer whose balance nets to zero never reaches this function — those
+ * rows are dropped in snapshot() — so nothing here can resurrect them.
+ */
+function groupSum(entry, fields) {
+  const raw = fields.reduce((s, f) => s + (entry.cols[f] || 0), 0);
+  return Math.max(0, Math.min(raw, entry.owed));
 }
 
 function sumFields(list, fields) {
   let t = 0;
-  for (const e of list) for (const f of fields) t += Math.max(0, e.cols[f] || 0);
+  for (const e of list) t += groupSum(e, fields);
   return round2(t);
 }
 
 function baseTotal(list) {
   let t = 0;
-  for (const e of list) t += Math.max(0, e.owed);
+  for (const e of list) t += e.owed;   // every entry is already net-positive
   return round2(t);
 }
 
@@ -187,9 +213,7 @@ function build(cur, prior, today, priorDate, priorError, debug) {
   const priorOldest = prior ? sumFields(prior.real, oldestFields) : null;
 
   const slipCfg = cfg.ar.slipping || { fields: ['Aging60', 'Aging90'] };
-  const slipping = cur.real.filter(
-    (e) => slipCfg.fields.reduce((s, f) => s + Math.max(0, e.cols[f] || 0), 0) > 0
-  );
+  const slipping = cur.real.filter((e) => groupSum(e, slipCfg.fields) > 0);
 
   // Rank by past-due money, never by total owed. A customer invoiced $30,500
   // two weeks ago owes nothing late and does not belong on a collections
@@ -200,7 +224,7 @@ function build(cur, prior, today, priorDate, priorError, debug) {
   const minPastDue = wcfg.minPastDue || 0;
 
   const withPastDue = cur.real
-    .map((e) => ({ ...e, pastDue: round2(basis.reduce((s, f) => s + Math.max(0, e.cols[f] || 0), 0)) }))
+    .map((e) => ({ ...e, pastDue: groupSum(e, basis) }))
     .filter((e) => e.pastDue >= minPastDue)
     .sort((a, b) => b.pastDue - a.pastDue);
 
@@ -247,9 +271,7 @@ function build(cur, prior, today, priorDate, priorError, debug) {
       amount: oldest,
       prior: priorOldest,
       delta: priorOldest === null ? null : round2(oldest - priorOldest),
-      customers: cur.real.filter(
-        (e) => oldestFields.reduce((s, f) => s + Math.max(0, e.cols[f] || 0), 0) > 0
-      ).length,
+      customers: cur.real.filter((e) => groupSum(e, oldestFields) > 0).length,
     },
 
     membershipTile: {
@@ -289,6 +311,7 @@ function build(cur, prior, today, priorDate, priorError, debug) {
       pagesFetched: cur.pagesFetched,
       hitPageLimit: cur.hitPageLimit,
       realCustomers: cur.real.length,
+      skippedZeroOrCreditBalance: cur.skippedZeroOrCredit,
       membershipCustomers: cur.membership.length,
       priorRows: prior ? prior.rows : null,
       membershipAmountsMatched: mcfg.amounts,
