@@ -215,32 +215,54 @@ function build(cur, prior, today, priorDate, priorError, debug) {
   const slipCfg = cfg.ar.slipping || { fields: ['Aging60', 'Aging90'] };
   const slipping = cur.real.filter((e) => groupSum(e, slipCfg.fields) > 0);
 
-  // Rank by past-due money, never by total owed. A customer invoiced $30,500
-  // two weeks ago owes nothing late and does not belong on a collections
-  // worklist — sorting by total put five such customers in the top twenty
-  // and pushed real past-due accounts off the screen entirely.
+  // One payload carries all three tabs. Switching tabs on the TV must never
+  // trigger another ServiceTitan call — the remote would outrun the five-per-
+  // minute limit in seconds, and the board would start erroring mid-click.
+  //
+  // Within a tab, rank by the money sitting in THAT range, never by total
+  // owed. Sorting by total puts customers on top who were invoiced two weeks
+  // ago and owe nothing in the range being displayed.
   const wcfg = cfg.ar.worklist || {};
-  const basis = wcfg.basis || ['Aging60', 'Aging90', 'Aging120', 'AgingPast120'];
-  const minPastDue = wcfg.minPastDue || 0;
+  const minAmount = wcfg.minPastDue || 0;
+  const size = wcfg.size || 20;
 
-  const withPastDue = cur.real
-    .map((e) => ({ ...e, pastDue: groupSum(e, basis) }))
-    .filter((e) => e.pastDue >= minPastDue)
-    .sort((a, b) => b.pastDue - a.pastDue);
+  const views = (cfg.ar.views || []).map((v) => {
+    const scored = cur.real
+      .map((e) => ({ e, amt: groupSum(e, v.fields) }))
+      .filter((x) => x.amt > 0);
 
-  const worklist = withPastDue.slice(0, wcfg.size || 20).map((e, i) => ({
-    rank: i + 1,
-    name: displayName(e.name),
-    pastDue: e.pastDue,
-    totalOwed: e.owed,
-    // Flagged so the board can say so out loud: this customer owes more than
-    // is actually late, and the caller should ask about the past-due part only.
-    hasCurrentToo: e.owed - e.pastDue > 0.5,
-    oldestBucket: oldestBucketLabel(e.cols),
-  }));
+    const eligible = scored.filter((x) => x.amt >= minAmount).sort((a, b) => b.amt - a.amt);
 
-  const shown = worklist.reduce((s, e) => s + e.pastDue, 0);
-  const notShownTotal = round2(withPastDue.reduce((s, e) => s + e.pastDue, 0) - shown);
+    const rows = eligible.slice(0, size).map((x, i) => ({
+      rank: i + 1,
+      name: displayName(x.e.name),
+      amount: round2(x.amt),
+      totalOwed: x.e.owed,
+      // True when the customer owes more than this range shows, so the caller
+      // asks about the right slice instead of opening with the whole balance.
+      hasMore: x.e.owed - x.amt > 0.5,
+      oldestBucket: oldestBucketLabel(x.e.cols),
+    }));
+
+    const shown = rows.reduce((s2, r) => s2 + r.amount, 0);
+    const eligibleTotal = eligible.reduce((s2, x) => s2 + x.amt, 0);
+
+    return {
+      key: v.key,
+      label: v.label,
+      sublabel: v.sublabel || '',
+      customers: scored.length,
+      total: round2(scored.reduce((s2, x) => s2 + x.amt, 0)),
+      rows,
+      overflow: {
+        customersNotShown: Math.max(0, eligible.length - rows.length),
+        amountNotShown: round2(Math.max(0, eligibleTotal - shown)),
+        belowMinimum: scored.length - eligible.length,
+        minAmount,
+      },
+      emptyMessage: v.emptyMessage || 'Nothing in this range.',
+    };
+  });
 
   const membershipTotal = round2(cur.membership.reduce((s, e) => s + e.owed, 0));
   const mcfg = cfg.ar.membership || {};
@@ -291,13 +313,12 @@ function build(cur, prior, today, priorDate, priorError, debug) {
       emptyMessage: slipCfg.emptyMessage || 'Nothing slipping.',
     },
 
-    worklist,
-    worklistLabel: wcfg.columnLabel || 'Past Due',
-    worklistOverflow: {
-      customersNotShown: Math.max(0, withPastDue.length - worklist.length),
-      amountNotShown: notShownTotal < 0 ? 0 : notShownTotal,
-      minPastDue,
-    },
+    views,
+    amountColumnLabel: wcfg.columnLabel || 'In This Range',
+    defaultView: cfg.ar.defaultView || (views[0] && views[0].key),
+    autoRotate: cfg.ar.autoRotate !== false,
+    rotateSeconds: cfg.ar.rotateSeconds || 30,
+    resumeAfterSeconds: cfg.ar.resumeAfterSeconds || 300,
 
     checklist: cfg.ar.checklist || [],
   };
