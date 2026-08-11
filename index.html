@@ -72,6 +72,22 @@
 
   main{display:grid;grid-template-columns:minmax(0,2.05fr) minmax(300px,1fr);gap:14px;flex:1;align-items:start}
 
+  .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:15px}
+  .tab{appearance:none;font-family:inherit;cursor:pointer;text-align:left;
+       border:2px solid var(--line);background:#fff;border-radius:11px;padding:9px 13px;
+       display:flex;flex-direction:column;gap:1px}
+  .tab .k{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--ink-3)}
+  .tab .t{font-size:16px;font-weight:700;color:var(--ink);line-height:1.2}
+  .tab .m{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+  .tab[aria-selected="true"]{background:var(--navy);border-color:var(--navy)}
+  .tab[aria-selected="true"] .t{color:#fff}
+  .tab[aria-selected="true"] .k{color:var(--cyan)}
+  .tab[aria-selected="true"] .m{color:#B9D2E2}
+  /* Both :focus and :focus-visible — some TV browsers never set the latter,
+     and a focus ring nobody can see makes the remote feel broken. */
+  .tab:focus,.tab:focus-visible{outline:4px solid var(--cyan);outline-offset:3px}
+  .rot{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--ink-3);
+       border:1px solid var(--line);border-radius:999px;padding:2px 8px}
   .listhead{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
   .listhead h2{font-family:'Archivo Expanded','Archivo',sans-serif;font-size:17px;font-weight:700;letter-spacing:.01em}
   .listhead .hint{font-size:12px;color:var(--ink-3);margin-left:auto;text-transform:uppercase;letter-spacing:.06em}
@@ -133,14 +149,18 @@
 
 <main>
   <section class="card">
+    <!-- Real buttons, not divs. A TV remote's D-pad drives browser focus, and
+         only genuinely focusable elements can receive it. -->
+    <div class="tabs" id="tabs" role="tablist" aria-label="Aging range"></div>
     <div class="listhead">
-      <h2>Today's Worklist</h2>
+      <h2 id="viewTitle">Worklist</h2>
+      <span class="rot" id="rotState"></span>
       <span class="hint" id="worklistHint"></span>
     </div>
     <table>
       <thead><tr>
         <th style="width:26px"></th><th>Customer</th>
-        <th class="r" id="pdHead">Past Due</th><th class="r">Total Owed</th>
+        <th class="r" id="amtHead">In This Range</th><th class="r">Total Owed</th>
         <th class="r">Oldest</th><th class="r" style="width:34px">Done</th>
       </tr></thead>
       <tbody id="worklist"></tbody>
@@ -238,36 +258,106 @@ function renderGauges(d){
   }).join('');
 }
 
-/* ---------- worklist ------------------------------------------------- */
+/* ---------- tabs + worklist ------------------------------------------
+   Driven by a TV remote, so three input paths all work:
+     · number keys 1/2/3 jump straight to a tab (fastest on any remote)
+     · left/right (and channel up/down, which TVs map to PageUp/PageDown)
+       cycle tabs from anywhere on the page, with no need to find the strip
+     · D-pad focus + OK, since the tabs are real focusable buttons
+   Up/down is left alone so the D-pad can still walk the checkbox column. */
 const doneKey = day => 'ar-called-' + day;
 function getDone(day){ try { return new Set(JSON.parse(localStorage.getItem(doneKey(day)) || '[]')); } catch(e){ return new Set(); } }
 function setDone(day,set){ try { localStorage.setItem(doneKey(day), JSON.stringify([...set])); } catch(e){} }
 
-function renderWorklist(d){
-  const day = d.asOfDate, done = getDone(day);
+let D = null, active = 0, paused = false, rotTimer = null, resumeTimer = null;
+
+function views(){ return (D && D.views) || []; }
+
+function selectView(i, byRemote){
+  const n = views().length; if(!n) return;
+  active = ((i % n) + n) % n;
+  renderTabs(); renderView();
+  if(byRemote){
+    pauseRotation();
+    const btn = document.querySelector(`.tab[data-i="${active}"]`);
+    if(btn) btn.focus();
+  }
+}
+
+function pauseRotation(){
+  paused = true; setRotState();
+  clearTimeout(resumeTimer);
+  // Resume on its own. A stray press on a remote sitting on a desk should not
+  // freeze the board on one tab for the rest of the day.
+  resumeTimer = setTimeout(() => { paused = false; setRotState(); },
+                           (D.resumeAfterSeconds || 300) * 1000);
+}
+
+function setRotState(){
+  const el = document.getElementById('rotState');
+  if(!D || !D.autoRotate){ el.textContent = ''; el.style.display='none'; return; }
+  el.style.display=''; el.textContent = paused ? 'HOLDING' : 'AUTO';
+}
+
+function startRotation(){
+  clearInterval(rotTimer);
+  if(!D || !D.autoRotate) { setRotState(); return; }
+  rotTimer = setInterval(() => { if(!paused) selectView(active + 1, false); },
+                         (D.rotateSeconds || 30) * 1000);
+  setRotState();
+}
+
+document.addEventListener('keydown', e => {
+  if(!views().length) return;
+  const k = e.key;
+  if(k >= '1' && k <= '9'){
+    const i = +k - 1;
+    if(i < views().length){ selectView(i, true); e.preventDefault(); }
+  } else if(k === 'ArrowRight' || k === 'PageDown' || k === 'ChannelUp'){
+    selectView(active + 1, true); e.preventDefault();
+  } else if(k === 'ArrowLeft' || k === 'PageUp' || k === 'ChannelDown'){
+    selectView(active - 1, true); e.preventDefault();
+  } else if(k === '0'){
+    paused = false; clearTimeout(resumeTimer); setRotState(); e.preventDefault();
+  }
+});
+
+function renderTabs(){
+  document.getElementById('tabs').innerHTML = views().map((v,i) => `
+    <button class="tab" role="tab" data-i="${i}" id="tab-${i}"
+            aria-selected="${i===active}" tabindex="${i===active?0:-1}">
+      <span class="k">${i+1}</span>
+      <span class="t">${escapeHTML(v.label)}</span>
+      <span class="m">${money(v.total)} · ${v.customers} account${v.customers===1?'':'s'}</span>
+    </button>`).join('');
+  document.querySelectorAll('.tab').forEach(b =>
+    b.addEventListener('click', () => selectView(+b.dataset.i, true)));
+}
+
+function renderView(){
+  const v = views()[active]; if(!v) return;
+  const day = D.asOfDate, done = getDone(day);
   const tb = document.getElementById('worklist');
 
-  document.getElementById('pdHead').textContent = d.worklistLabel || 'Past Due';
+  document.getElementById('viewTitle').textContent = v.label + (v.sublabel ? ' — ' + v.sublabel : '');
+  document.getElementById('amtHead').textContent = D.amountColumnLabel || 'In This Range';
 
-  if(!d.worklist.length){
-    tb.innerHTML = `<tr><td colspan="6" style="padding:26px 8px" class="good-news">
-      Nothing past due above ${money(d.worklistOverflow.minPastDue)}. Enjoy it.</td></tr>`;
+  if(!v.rows.length){
+    tb.innerHTML = `<tr><td colspan="6" style="padding:26px 8px" class="good-news">${escapeHTML(v.emptyMessage)}</td></tr>`;
     document.getElementById('overflow').textContent = '';
     document.getElementById('worklistHint').textContent = '';
     return;
   }
 
-  tb.innerHTML = d.worklist.map(w => {
+  tb.innerHTML = v.rows.map(w => {
     const isDone = done.has(w.name);
-    // Total is shown greyed and only when it differs — so the caller knows to
-    // ask about the past-due portion, not the whole balance.
-    const total = w.hasCurrentToo
-      ? `<span title="Total balance including invoices not yet past due">${moneyExact(w.totalOwed)}</span>`
+    const total = w.hasMore
+      ? `<span title="Total balance across all ages">${moneyExact(w.totalOwed)}</span>`
       : '<span class="same">same</span>';
     return `<tr class="${isDone?'done':''}" data-name="${escapeAttr(w.name)}">
       <td class="rk">${w.rank}</td>
       <td class="nm" title="${escapeAttr(w.name)}">${escapeHTML(w.name)}</td>
-      <td class="r ow">${moneyExact(w.pastDue)}</td>
+      <td class="r ow">${moneyExact(w.amount)}</td>
       <td class="r tot">${total}</td>
       <td class="r bk">${w.oldestBucket}</td>
       <td class="ck"><input type="checkbox" ${isDone?'checked':''} aria-label="Called ${escapeAttr(w.name)}"></td>
@@ -280,21 +370,25 @@ function renderWorklist(d){
       e.target.checked ? set.add(name) : set.delete(name);
       setDone(day,set);
       tr.classList.toggle('done', e.target.checked);
-      updateHint(d);
+      updateHint();
     });
   });
 
-  updateHint(d);
-  const o = d.worklistOverflow;
-  document.getElementById('overflow').textContent = o.customersNotShown > 0
-    ? `${o.customersNotShown} more past-due accounts below this list, ${money(o.amountNotShown)} between them. Anything under ${money(o.minPastDue)} past due is not listed.`
-    : 'This is every past-due account above the minimum.';
+  updateHint();
+  const o = v.overflow, bits = [];
+  if(o.customersNotShown > 0)
+    bits.push(`${o.customersNotShown} more in this range below the list, ${money(o.amountNotShown)} between them.`);
+  if(o.belowMinimum > 0)
+    bits.push(`${o.belowMinimum} under ${money(o.minAmount)} not listed.`);
+  document.getElementById('overflow').textContent =
+    bits.length ? bits.join(' ') : 'This is every account in this range.';
 }
 
-function updateHint(d){
-  const done = getDone(d.asOfDate);
-  const n = d.worklist.filter(w => done.has(w.name)).length;
-  document.getElementById('worklistHint').textContent = `${n} of ${d.worklist.length} called today`;
+function updateHint(){
+  const v = views()[active]; if(!v) return;
+  const done = getDone(D.asOfDate);
+  const n = v.rows.filter(w => done.has(w.name)).length;
+  document.getElementById('worklistHint').textContent = `${n} of ${v.rows.length} called today`;
 }
 
 /* ---------- tiles ---------------------------------------------------- */
@@ -352,8 +446,16 @@ async function load(){
     document.getElementById('title').textContent = d.title;
     document.getElementById('subtitle').textContent = d.subtitle;
 
+    const first = !D;
+    D = d;
+    if(first){
+      const i = views().findIndex(v => v.key === d.defaultView);
+      active = i >= 0 ? i : 0;
+      startRotation();
+    }
     renderGauges(d);
-    renderWorklist(d);
+    renderTabs();
+    renderView();
     renderTiles(d);
 
     document.getElementById('checklist').innerHTML =
