@@ -1,8 +1,6 @@
 {
   "_comment": "AR board config. Edit, commit, Netlify redeploys in ~30 seconds. Nothing secret belongs in here.",
-
   "timezone": "America/Chicago",
-
   "report": {
     "_comment": "ServiceTitan report 435, 'OD - AR Transactions By Customer'. Customer-level, ServiceTitan's own aging math.",
     "category": "accounting",
@@ -15,74 +13,110 @@
       "ExcludeUnappliedPayments": false
     }
   },
-
   "ar": {
     "title": "ACCOUNTS RECEIVABLE",
     "subtitle": "Omaha Drain",
-
     "refreshMinutes": 15,
     "compareDaysAgo": 7,
-
-    "_worklistNote": "The worklist ranks by PAST DUE money, not by total owed. Sorting by total owed puts customers at the top who were invoiced two weeks ago and owe nothing late — a collections person would spend the morning calling people who are not late. 'basis' is which columns count as past due; the default is everything 31 days and older, matching the first gauge. minPastDue is a call-list floor only: it decides who is worth a phone call, and it deliberately does NOT affect the gauges, which measure all receivables.",
+    "_worklistNote": "The worklist ranks by PAST DUE money, not by total owed. Sorting by total owed puts customers at the top who were invoiced two weeks ago and owe nothing late \u2014 a collections person would spend the morning calling people who are not late. 'basis' is which columns count as past due; the default is everything 31 days and older, matching the first gauge. minPastDue is a call-list floor only: it decides who is worth a phone call, and it deliberately does NOT affect the gauges, which measure all receivables.",
     "worklist": {
-      "basis": ["Aging60", "Aging90", "Aging120", "AgingPast120"],
-      "columnLabel": "Past Due",
+      "basis": [
+        "Aging60",
+        "Aging90",
+        "Aging120",
+        "AgingPast120"
+      ],
+      "columnLabel": "In This Range",
       "minPastDue": 1000,
       "size": 20
     },
-
     "privacy": {
-      "_note": "nameStyle: full | initial | hidden. This screen sits at one desk facing a wall, so full is appropriate. Change to initial if it ever moves somewhere customers can see it.",
+      "_note": "nameStyle: full | initial | hidden. Set to 'full' deliberately \u2014 this board carries customer names and balances on a TV, and that was a considered decision, not a default. If the screen ever moves somewhere a customer, vendor or visitor can see it, change this to 'initial' and it renders 'Leah R.' instead. No code change needed.",
       "nameStyle": "full"
     },
-
-    "_membershipNote": "A $99 recurring charge that failed to bill, appearing as identical balances across hundreds of accounts. These are a billing fix, not collections calls, so they are pulled out of the aging math entirely and shown as one tile. Matching is by exact amount because report 435 carries no membership field — watch the customer count on the tile; if it drifts, the amount list needs updating.",
+    "_membershipNote": "A $99 recurring charge that failed to bill, appearing as identical balances across hundreds of accounts. These are a billing fix, not collections calls, so they are pulled out of the aging math entirely and shown as one tile. Matching is by exact amount because report 435 carries no membership field \u2014 watch the customer count on the tile; if it drifts, the amount list needs updating.",
     "membership": {
       "enabled": true,
       "label": "Membership Dues",
       "note": "Membership dues to clean up. Billing fix, not a collections call.",
-      "amounts": [99.0, 99.51, 105.93, 198.0, 204.93, 211.86],
+      "amounts": [
+        99.0,
+        99.51,
+        105.93,
+        198.0,
+        204.93,
+        211.86
+      ],
       "tolerance": 0.02
     },
-
-    "_gaugeNote": "Cumulative, not per-bucket: 'over 60' includes everything 61 days and older. Each gauge carries its own thresholds, because the same percentage means different things at different ages — 25% of receivables sitting past 30 days is normal trade credit, while 25% sitting past 90 days is money you may never see. Membership dues are excluded from both the top and bottom of every ratio.",
+    "_gaugeNote": "Cumulative, not per-bucket: 'over 60' includes everything 61 days and older. Each gauge carries its own thresholds, because the same percentage means different things at different ages \u2014 25% of receivables sitting past 30 days is normal trade credit, while 25% sitting past 90 days is money you may never see. Membership dues are excluded from both the top and bottom of every ratio.",
     "gauges": [
       {
         "key": "over30",
         "label": "Over 30 Days",
-        "fields": ["Aging60", "Aging90", "Aging120", "AgingPast120"],
-        "bands": { "goodMax": 30, "warnMax": 60 }
+        "fields": [
+          "Aging60",
+          "Aging90",
+          "Aging120",
+          "AgingPast120"
+        ],
+        "bands": {
+          "goodMax": 30,
+          "warnMax": 60
+        }
       },
       {
         "key": "over60",
         "label": "Over 60 Days",
-        "fields": ["Aging90", "Aging120", "AgingPast120"],
-        "bands": { "goodMax": 20, "warnMax": 40 }
+        "fields": [
+          "Aging90",
+          "Aging120",
+          "AgingPast120"
+        ],
+        "bands": {
+          "goodMax": 20,
+          "warnMax": 40
+        }
       },
       {
         "key": "over90",
         "label": "Over 90 Days",
-        "fields": ["Aging120", "AgingPast120"],
-        "bands": { "goodMax": 10, "warnMax": 20 }
+        "fields": [
+          "Aging120",
+          "AgingPast120"
+        ],
+        "bands": {
+          "goodMax": 10,
+          "warnMax": 20
+        }
       }
     ],
-
-    "_bandsNote": "Fallback only — used if a gauge above has no bands of its own. At or below goodMax is green, up to warnMax is orange, at or above warnMax is red.",
-    "bands": { "goodMax": 20, "warnMax": 50 },
-    "bandLabels": { "good": "ON TRACK", "warn": "WATCH", "bad": "CRITICAL" },
-
+    "_bandsNote": "Fallback only \u2014 used if a gauge above has no bands of its own. At or below goodMax is green, up to warnMax is orange, at or above warnMax is red.",
+    "bands": {
+      "goodMax": 20,
+      "warnMax": 50
+    },
+    "bandLabels": {
+      "good": "ON TRACK",
+      "warn": "WATCH",
+      "bad": "CRITICAL"
+    },
     "slipping": {
       "label": "Slipping",
       "sublabel": "31 - 90 days",
-      "fields": ["Aging60", "Aging90"],
+      "fields": [
+        "Aging60",
+        "Aging90"
+      ],
       "emptyMessage": "Nothing slipping. This is the win."
     },
-
     "oldest": {
       "label": "Over 90 Days",
-      "fields": ["Aging120", "AgingPast120"]
+      "fields": [
+        "Aging120",
+        "AgingPast120"
+      ]
     },
-
     "bucketLabels": {
       "Current": "Current",
       "Aging30": "1 - 30",
@@ -91,15 +125,51 @@
       "Aging120": "91 - 120",
       "AgingPast120": "121+"
     },
-
     "_checklistNote": "Plain text, edit freely. Shows along the bottom of the screen.",
     "checklist": [
-      "Work the list top down — biggest PAST DUE first, always",
+      "Work the list top down \u2014 biggest PAST DUE first, always",
       "Log every call in ServiceTitan, even the no-answers",
       "Text or email a payment link on any no-answer before moving on",
       "Anything over $2,000: get a payment date on the calendar, not a promise",
       "New name in Slipping? Call it this week, before it turns 90",
       "End of day: mark what you collected and what needs a callback"
-    ]
+    ],
+    "_viewsNote": "Three tabs on the board, switched with the TV remote. These are exclusive ranges, unlike the gauges above them which are cumulative \u2014 a tab shows only the money sitting in that range. Note the 1-30 tab is NOT past due; it is what is coming due, and it is there so nothing slides into the next tab unnoticed.",
+    "views": [
+      {
+        "key": "b30",
+        "label": "1 - 30 Days",
+        "sublabel": "Coming due",
+        "fields": [
+          "Aging30"
+        ],
+        "emptyMessage": "Nothing in this range."
+      },
+      {
+        "key": "b60",
+        "label": "31 - 60 Days",
+        "sublabel": "Just slipped",
+        "fields": [
+          "Aging60"
+        ],
+        "emptyMessage": "Nothing slipped this month. This is the win."
+      },
+      {
+        "key": "b90",
+        "label": "61 - 90+ Days",
+        "sublabel": "Chase these first",
+        "fields": [
+          "Aging90",
+          "Aging120",
+          "AgingPast120"
+        ],
+        "emptyMessage": "Nothing old. Outstanding."
+      }
+    ],
+    "_rotationNote": "The board rotates on its own so it is useful when nobody touches it: five minutes per tab, fifteen minutes for a full cycle. Any remote press pauses rotation and holds that tab; it resumes by itself after resumeAfterSeconds so a stray button press does not freeze the screen for the rest of the day.",
+    "defaultView": "b90",
+    "autoRotate": true,
+    "rotateSeconds": 300,
+    "resumeAfterSeconds": 300
   }
 }
